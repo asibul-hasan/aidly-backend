@@ -1,6 +1,0 @@
-@Aidly_HostAddress = http://localhost:5135
-
-GET {{Aidly_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
