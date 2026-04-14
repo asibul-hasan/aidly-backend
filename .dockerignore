@@ -8,6 +8,5 @@
 **/.git/
 **/.github/
 **/node_modules/
-**/Dockerfile*
 **/docker-compose*.yml
 appsettings.Development.json
