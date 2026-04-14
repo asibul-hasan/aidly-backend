@@ -2,10 +2,13 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Aidly.src.Modules.Core.Domain.Interfaces;
-using Aidly.src.Modules.Core.Application.Services;
+using Aidly.src.Modules.Core.Domain.Interfaces.User;
+using Aidly.src.Modules.Core.Domain.Interfaces.Company;
+using Aidly.src.Modules.Core.Application.Services.User;
+using Aidly.src.Modules.Core.Application.Services.Company;
 using Aidly.src.Modules.Core.Infrastructure.Persistence;
-using Aidly.src.Modules.Core.Infrastructure.Persistence.Repositories;
+using Aidly.src.Modules.Core.Infrastructure.Persistence.Repositories.User;
+using Aidly.src.Modules.Core.Infrastructure.Persistence.Repositories.Company;
 using Aidly.src.Shared.Infrastructure.Modules;
 
 namespace Aidly.src.Modules.Core;
@@ -24,9 +27,11 @@ services.AddDbContext<CoreDbContext>(options =>
            .UseSnakeCaseNamingConvention());
         // Register Repositories
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ICompanyRepository, CompanyRepository>();
 
         // Register Application Services
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<ICompanyService, CompanyService>();
 
         return services;
     }

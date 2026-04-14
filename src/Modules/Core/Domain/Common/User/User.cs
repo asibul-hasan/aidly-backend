@@ -2,7 +2,7 @@ using Aidly.src.Modules.Core.Domain.Base;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Aidly.src.Modules.Core.Domain.Common;
+namespace Aidly.src.Modules.Core.Domain.Common.User;
 
 [Table("sys_user")]
 public class User : BaseEntity

@@ -1,4 +1,4 @@
-namespace Aidly.src.Modules.Core.Application.DTOs;
+namespace Aidly.src.Modules.Core.Application.DTOs.User;
 
 public record UserResponseDto(
     int UserNo,

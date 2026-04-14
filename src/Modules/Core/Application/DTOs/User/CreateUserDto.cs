@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Aidly.src.Modules.Core.Application.DTOs;
+namespace Aidly.src.Modules.Core.Application.DTOs.User;
 
 public record CreateUserDto(
     [Required] string FullName,

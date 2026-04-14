@@ -1,4 +1,4 @@
-namespace Aidly.src.Modules.Core.Domain.Enums;
+namespace Aidly.src.Modules.Core.Domain.Enums.User;
 
 public enum UserRole
 {

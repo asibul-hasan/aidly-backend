@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using Aidly.src.Modules.Core.Application.DTOs;
-using Aidly.src.Modules.Core.Domain.Interfaces;
+using Aidly.src.Modules.Core.Application.DTOs.User;
+using Aidly.src.Modules.Core.Domain.Interfaces.User;
 
-namespace Aidly.src.Modules.Core.Application.Controllers;
+namespace Aidly.src.Modules.Core.Application.Controllers.User;
 
 [ApiController]
 [Route("aidly/core/users")]
@@ -52,6 +52,6 @@ public class UserController : ControllerBase
     {
         var result = await _userService.DeleteUserAsync(id);
         if (result.IsSuccess) return Ok(result.Value);
-        return BadRequest(result.Error);
+        return NotFound(result.Error);
     }
 }
