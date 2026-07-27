@@ -1,0 +1,52 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.swp
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!packages/build/
+
+# Runtime artefacts
+uploads/
+*.pid
+*.seed
+
+# Local secrets — never commit connection strings or JWT keys
+appsettings.Local.json
+appsettings.*.local.json
+appsettings.Secrets.json
+secrets.json
+*.pfx
+*.key
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Retired scaffold controllers kept locally for reference
+*.legacy

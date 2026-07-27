@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AidlyErp.Api/AidlyErp.Api.csproj" />
+    <Project Path="src/AidlyErp.Application/AidlyErp.Application.csproj" />
+    <Project Path="src/AidlyErp.Domain/AidlyErp.Domain.csproj" />
+    <Project Path="src/AidlyErp.Infrastructure/AidlyErp.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AidlyErp.Tests/AidlyErp.Tests.csproj" />
+  </Folder>
+</Solution>
