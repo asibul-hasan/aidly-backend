@@ -67,7 +67,7 @@ public class Pur1001Service : IPur1001Service
             {
                 CompanyNo = companyNo,
                 BranchNo = dto.BranchNo ?? _ctx.CurrentBranchNo(),
-                SupplierCode = string.IsNullOrWhiteSpace(dto.SupplierCode) ? $"SUP{DateTime.UtcNow:yyyyMMddHHmmss}" : dto.SupplierCode.Trim().ToUpperInvariant(),
+                SupplierId = string.IsNullOrWhiteSpace(dto.SupplierCode) ? $"SUP{DateTime.UtcNow:yyyyMMddHHmmss}" : dto.SupplierCode.Trim().ToUpperInvariant(),
                 SupplierName = dto.SupplierName.Trim(),
                 CompanyName = dto.CompanyName,
                 Email = dto.Email,
@@ -99,7 +99,7 @@ public class Pur1001Service : IPur1001Service
     private static Pur1001SupplierDto ToDto(PurSupplier s) => new()
     {
         SupplierNo = s.SupplierNo,
-        SupplierCode = s.SupplierCode,
+        SupplierCode = s.SupplierId,
         SupplierName = s.SupplierName,
         CompanyName = s.CompanyName,
         Email = s.Email,

@@ -84,7 +84,7 @@ public class Sal1101Service : ISal1101Service
             {
                 CompanyNo = companyNo,
                 BranchNo = dto.BranchNo ?? _ctx.CurrentBranchNo(),
-                CustomerCode = code,
+                CustomerId = code,
                 CustomerName = dto.CustomerName.Trim(),
                 CompanyName = dto.CompanyName,
                 CustomerGroup = dto.CustomerGroup,
@@ -129,14 +129,14 @@ public class Sal1101Service : ISal1101Service
         long count = await _db.SalCustomers.CountAsync(c => c.CompanyNo == companyNo, ct) + 1;
         string code;
         do { code = $"CUST{count++:D4}"; }
-        while (await _db.SalCustomers.AnyAsync(c => c.CustomerCode == code && c.CompanyNo == companyNo && c.IsDeleted == 0, ct));
+        while (await _db.SalCustomers.AnyAsync(c => c.CustomerId == code && c.CompanyNo == companyNo && c.IsDeleted == 0, ct));
         return code;
     }
 
     private static Sal1101CustomerDto ToDto(SalCustomer c) => new()
     {
         CustomerNo = c.CustomerNo,
-        CustomerCode = c.CustomerCode,
+        CustomerCode = c.CustomerId,
         CustomerName = c.CustomerName,
         CompanyName = c.CompanyName,
         CustomerGroup = c.CustomerGroup,

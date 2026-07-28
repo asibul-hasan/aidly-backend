@@ -12,9 +12,10 @@ public class SalCustomer : AuditEntity
     [Column("customer_no")]
     public long CustomerNo { get; set; }
 
-    [Column("customer_code")]
+    /// <summary>The business key is <c>customer_id</c> in the schema, not <c>customer_code</c>.</summary>
+    [Column("customer_id")]
     [StringLength(30)]
-    public string CustomerCode { get; set; } = string.Empty;
+    public string CustomerId { get; set; } = string.Empty;
 
     [Column("customer_name")]
     [StringLength(200)]

@@ -36,7 +36,7 @@ public class InvDbContext : ModuleDbContext, IInvDbContext
     {
         modelBuilder.Entity<InvProduct>(entity =>
         {
-            entity.HasIndex(e => new { e.CompanyNo, e.ProductCode, e.IsDeleted }).HasDatabaseName("idx_inv_prod_code_deleted");
+            entity.HasIndex(e => new { e.CompanyNo, e.ProductId, e.IsDeleted }).HasDatabaseName("idx_inv_prod_code_deleted");
             entity.HasIndex(e => new { e.CategoryNo, e.IsDeleted }).HasDatabaseName("idx_inv_prod_cat_deleted");
         });
 

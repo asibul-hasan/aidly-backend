@@ -112,7 +112,7 @@ public class CommonLookupService : ICommonLookupService
         var warehouses = await _inv.ListWarehousesAsync(branchNo: _ctx.BranchNo, cancellationToken: ct);
 
         return warehouses
-            .Select(w => new LookupDto { No = w.WarehouseNo, Code = w.WarehouseCode, Name = w.WarehouseName })
+            .Select(w => new LookupDto { No = w.WarehouseNo, Code = w.WarehouseId, Name = w.WarehouseName })
             .ToList();
     }
 }

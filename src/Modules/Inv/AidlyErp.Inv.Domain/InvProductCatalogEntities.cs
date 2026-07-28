@@ -12,9 +12,10 @@ public class InvProduct : AuditEntity
     [Column("product_no")]
     public long ProductNo { get; set; }
 
-    [Column("product_code")]
+    /// <summary>The business key is <c>product_id</c> in the schema, not <c>product_code</c>.</summary>
+    [Column("product_id")]
     [StringLength(50)]
-    public string ProductCode { get; set; } = string.Empty;
+    public string ProductId { get; set; } = string.Empty;
 
     [Column("product_name")]
     [StringLength(250)]
@@ -120,9 +121,10 @@ public class InvUom : AuditEntity
     [Column("uom_no")]
     public long UomNo { get; set; }
 
-    [Column("uom_code")]
+    /// <summary>The business key is <c>uom_id</c> in the schema, not <c>uom_code</c>.</summary>
+    [Column("uom_id")]
     [StringLength(20)]
-    public string UomCode { get; set; } = string.Empty;
+    public string UomId { get; set; } = string.Empty;
 
     [Column("uom_name")]
     [StringLength(100)]

@@ -31,7 +31,7 @@ public class PurDbContext : ModuleDbContext, IPurDbContext
     {
         modelBuilder.Entity<PurSupplier>(entity =>
         {
-            entity.HasIndex(e => new { e.CompanyNo, e.SupplierCode, e.IsDeleted }).HasDatabaseName("idx_pur_sup_code_deleted");
+            entity.HasIndex(e => new { e.CompanyNo, e.SupplierId, e.IsDeleted }).HasDatabaseName("idx_pur_sup_code_deleted");
         });
 
         modelBuilder.Entity<PurOrder>(entity =>

@@ -12,17 +12,18 @@ public class InvWarehouse : AuditEntity
     [Column("warehouse_no")]
     public long WarehouseNo { get; set; }
 
-    [Column("warehouse_code")]
+    /// <summary>The business key is <c>warehouse_id</c> in the schema, not <c>warehouse_code</c>.</summary>
+    [Column("warehouse_id")]
     [StringLength(30)]
-    public string WarehouseCode { get; set; } = string.Empty;
+    public string WarehouseId { get; set; } = string.Empty;
 
     [Column("warehouse_name")]
     [StringLength(150)]
     public string WarehouseName { get; set; } = string.Empty;
 
-    [Column("location")]
+    [Column("address")]
     [StringLength(250)]
-    public string? Location { get; set; }
+    public string? Address { get; set; }
 
     [Column("branch_no")]
     public long BranchNo { get; set; }

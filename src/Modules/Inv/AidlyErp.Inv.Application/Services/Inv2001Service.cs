@@ -27,7 +27,7 @@ public class Inv2001Service : IInv2001Service
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? 0;
         return await _db.InvWarehouses.AsNoTracking().Where(w => w.CompanyNo == companyNo && w.IsDeleted == 0).OrderBy(w => w.WarehouseName)
-            .Select(w => new Inv2001WarehouseDto { WarehouseNo = w.WarehouseNo, WarehouseCode = w.WarehouseCode, WarehouseName = w.WarehouseName, Location = w.Location, IsActive = w.IsActive }).ToListAsync(ct);
+            .Select(w => new Inv2001WarehouseDto { WarehouseNo = w.WarehouseNo, WarehouseCode = w.WarehouseId, WarehouseName = w.WarehouseName, Location = w.Address, IsActive = w.IsActive }).ToListAsync(ct);
     }
 
     public async Task<Inv2001WarehouseDto> SaveAsync(Inv2001WarehouseDto dto, CancellationToken ct = default)
@@ -38,11 +38,11 @@ public class Inv2001Service : IInv2001Service
         if (dto.WarehouseNo.HasValue && dto.WarehouseNo.Value > 0)
         {
             wh = await _db.InvWarehouses.FirstOrDefaultAsync(w => w.WarehouseNo == dto.WarehouseNo.Value && w.IsDeleted == 0, ct) ?? throw new NotFoundException($"Warehouse not found: {dto.WarehouseNo}");
-            wh.WarehouseName = dto.WarehouseName!; wh.Location = dto.Location; wh.IsActive = dto.IsActive;
+            wh.WarehouseName = dto.WarehouseName!; wh.Address = dto.Location; wh.IsActive = dto.IsActive;
         }
         else
         {
-            wh = new InvWarehouse { CompanyNo = companyNo, BranchNo = branchNo, WarehouseCode = dto.WarehouseCode ?? $"WH-{DateTime.UtcNow:MMddHHmmss}", WarehouseName = dto.WarehouseName!, Location = dto.Location, IsActive = dto.IsActive, IsDeleted = 0, CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow };
+            wh = new InvWarehouse { CompanyNo = companyNo, BranchNo = branchNo, WarehouseId = dto.WarehouseCode ?? $"WH-{DateTime.UtcNow:MMddHHmmss}", WarehouseName = dto.WarehouseName!, Address = dto.Location, IsActive = dto.IsActive, IsDeleted = 0, CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow };
             _db.InvWarehouses.Add(wh);
         }
         await _db.SaveChangesAsync(ct);

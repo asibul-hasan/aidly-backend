@@ -113,7 +113,7 @@ public class CommonLookupController : ApiControllerBase
     {
         var data = await _inv.InvWarehouses
             .AsNoTracking()
-            .Select(x => new { id = x.WarehouseNo, code = x.WarehouseCode, name = x.WarehouseName })
+            .Select(x => new { id = x.WarehouseNo, code = x.WarehouseId, name = x.WarehouseName })
             .ToListAsync();
         return OkResponse(data);
     }
@@ -123,7 +123,7 @@ public class CommonLookupController : ApiControllerBase
     {
         var data = await _inv.InvProducts
             .AsNoTracking()
-            .Select(x => new { id = x.ProductNo, code = x.ProductCode, name = x.ProductName })
+            .Select(x => new { id = x.ProductNo, code = x.ProductId, name = x.ProductName })
             .ToListAsync();
         return OkResponse(data);
     }
@@ -133,7 +133,7 @@ public class CommonLookupController : ApiControllerBase
     {
         var data = await _inv.InvUoms
             .AsNoTracking()
-            .Select(x => new { id = x.UomNo, code = x.UomCode, name = x.UomName })
+            .Select(x => new { id = x.UomNo, code = x.UomId, name = x.UomName })
             .ToListAsync();
         return OkResponse(data);
     }
@@ -153,7 +153,7 @@ public class CommonLookupController : ApiControllerBase
     {
         var data = await _pur.PurSuppliers
             .AsNoTracking()
-            .Select(x => new { id = x.SupplierNo, code = x.SupplierCode, name = x.SupplierName })
+            .Select(x => new { id = x.SupplierNo, code = x.SupplierId, name = x.SupplierName })
             .ToListAsync();
         return OkResponse(data);
     }
@@ -163,7 +163,7 @@ public class CommonLookupController : ApiControllerBase
     {
         var data = await _sal.SalCustomers
             .AsNoTracking()
-            .Select(x => new { id = x.CustomerNo, code = x.CustomerCode, name = x.CustomerName })
+            .Select(x => new { id = x.CustomerNo, code = x.CustomerId, name = x.CustomerName })
             .ToListAsync();
         return OkResponse(data);
     }

@@ -24,7 +24,7 @@ public class SalDbContext : ModuleDbContext, ISalDbContext
     {
         modelBuilder.Entity<SalCustomer>(entity =>
         {
-            entity.HasIndex(e => new { e.CompanyNo, e.CustomerCode, e.IsDeleted }).HasDatabaseName("idx_sal_cust_code_deleted");
+            entity.HasIndex(e => new { e.CompanyNo, e.CustomerId, e.IsDeleted }).HasDatabaseName("idx_sal_cust_code_deleted");
         });
 
         modelBuilder.Entity<SalInvoice>(entity =>

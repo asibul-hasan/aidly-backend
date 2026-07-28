@@ -26,6 +26,21 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Local developer secrets — connection string and JWT key. Gitignored, and not an environment
+// name, so the conventional appsettings.{Environment}.json probe never picks it up; it has to be
+// added explicitly. Optional, so CI and containers fall through to environment variables.
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
+// Fail at startup, not on the first request that happens to hit a bad registration. With one
+// DbContext per module and cross-module contracts resolved through DI, a missing or
+// wrongly-scoped registration is the most likely wiring mistake — this surfaces all of them at
+// boot. Development only: ValidateOnBuild constructs every registration, which costs startup time.
+builder.Host.UseDefaultServiceProvider((context, options) =>
+{
+    options.ValidateScopes = context.HostingEnvironment.IsDevelopment();
+    options.ValidateOnBuild = context.HostingEnvironment.IsDevelopment();
+});
+
 /// <summary>Swagger document groups, mirroring the Java SwaggerConfig GroupedOpenApi beans.</summary>
 var SwaggerGroups = new (string Name, string Title)[]
 {

@@ -12,9 +12,10 @@ public class PurSupplier : AuditEntity
     [Column("supplier_no")]
     public long SupplierNo { get; set; }
 
-    [Column("supplier_code")]
+    /// <summary>The business key is <c>supplier_id</c> in the schema, not <c>supplier_code</c>.</summary>
+    [Column("supplier_id")]
     [StringLength(30)]
-    public string SupplierCode { get; set; } = string.Empty;
+    public string SupplierId { get; set; } = string.Empty;
 
     [Column("supplier_name")]
     [StringLength(200)]

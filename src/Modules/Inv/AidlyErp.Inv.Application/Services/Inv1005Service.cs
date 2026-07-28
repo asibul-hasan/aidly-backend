@@ -27,7 +27,7 @@ public class Inv1005Service : IInv1005Service
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? 0;
         return await _db.InvUoms.AsNoTracking().Where(u => u.CompanyNo == companyNo && u.IsDeleted == 0).OrderBy(u => u.UomName)
-            .Select(u => new Inv1005UomDto { UomNo = u.UomNo, UomCode = u.UomCode, UomName = u.UomName, IsActive = u.IsActive }).ToListAsync(ct);
+            .Select(u => new Inv1005UomDto { UomNo = u.UomNo, UomCode = u.UomId, UomName = u.UomName, IsActive = u.IsActive }).ToListAsync(ct);
     }
 
     public async Task<Inv1005UomDto> SaveAsync(Inv1005UomDto dto, CancellationToken ct = default)
@@ -41,7 +41,7 @@ public class Inv1005Service : IInv1005Service
         }
         else
         {
-            uom = new InvUom { CompanyNo = companyNo, UomCode = dto.UomCode ?? $"UOM-{DateTime.UtcNow:MMddHHmmss}", UomName = dto.UomName!, IsActive = dto.IsActive, IsDeleted = 0, CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow };
+            uom = new InvUom { CompanyNo = companyNo, UomId = dto.UomCode ?? $"UOM-{DateTime.UtcNow:MMddHHmmss}", UomName = dto.UomName!, IsActive = dto.IsActive, IsDeleted = 0, CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow };
             _db.InvUoms.Add(uom);
         }
         await _db.SaveChangesAsync(ct);

@@ -3,7 +3,7 @@ namespace AidlyErp.Inv.Contracts;
 /// <summary>Public read model of a product. Not the <c>InvProduct</c> entity — that stays inside INV.</summary>
 public sealed record ProductInfo(
     long ProductNo,
-    string? ProductCode,
+    string? ProductId,
     string? ProductName,
     long? CompanyNo,
     /// <summary>Always null — products are company-scoped in this schema, not branch-scoped.</summary>
@@ -12,7 +12,7 @@ public sealed record ProductInfo(
 /// <summary>Public read model of a warehouse.</summary>
 public sealed record WarehouseInfo(
     long WarehouseNo,
-    string? WarehouseCode,
+    string? WarehouseId,
     string? WarehouseName,
     long? CompanyNo,
     long? BranchNo);

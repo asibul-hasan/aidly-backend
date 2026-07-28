@@ -124,7 +124,7 @@ public class Inv1001Service : IInv1001Service
             p = new InvProduct
             {
                 CompanyNo = companyNo,
-                ProductCode = code,
+                ProductId = code,
                 ProductName = dto.ProductName.Trim(),
                 CategoryNo = dto.CategoryNo,
                 BrandNo = dto.BrandNo,
@@ -177,7 +177,7 @@ public class Inv1001Service : IInv1001Service
         {
             Barcode = barcode,
             ProductNo = prd.ProductNo,
-            ProductCode = prd.ProductCode,
+            ProductCode = prd.ProductId,
             ProductName = prd.ProductName,
             VariantNo = bc.VariantNo,
             VariantName = varName,
@@ -189,7 +189,7 @@ public class Inv1001Service : IInv1001Service
     private static Inv1001ProductDto ToDto(InvProduct p, string? catName, string? uomName, string? brandName) => new()
     {
         ProductNo = p.ProductNo,
-        ProductCode = p.ProductCode,
+        ProductCode = p.ProductId,
         ProductName = p.ProductName,
         CategoryNo = p.CategoryNo,
         CategoryName = catName,

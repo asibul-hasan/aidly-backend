@@ -43,6 +43,9 @@
     <Project Path="src/Modules/Sal/AidlyErp.Sal.Application/AidlyErp.Sal.Application.csproj" />
     <Project Path="src/Modules/Sal/AidlyErp.Sal.Infrastructure/AidlyErp.Sal.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/Architecture/">
+    <Project Path="tests/Architecture/AidlyErp.Architecture.Tests/AidlyErp.Architecture.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AidlyErp.Tests/AidlyErp.Tests.csproj" />
   </Folder>

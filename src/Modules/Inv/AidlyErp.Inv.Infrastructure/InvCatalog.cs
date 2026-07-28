@@ -19,7 +19,7 @@ internal sealed class InvCatalog : IInvCatalog
             .AsNoTracking()
             .Where(p => p.ProductNo == productNo && p.IsDeleted == Deleted
                         && (companyNo == null || p.CompanyNo == companyNo))
-            .Select(p => new ProductInfo(p.ProductNo, p.ProductCode, p.ProductName, p.CompanyNo, null))
+            .Select(p => new ProductInfo(p.ProductNo, p.ProductId, p.ProductName, p.CompanyNo, null))
             .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyDictionary<long, string>> GetProductNamesAsync(
@@ -38,7 +38,7 @@ internal sealed class InvCatalog : IInvCatalog
         await _db.InvWarehouses
             .AsNoTracking()
             .Where(w => w.WarehouseNo == warehouseNo && w.IsDeleted == Deleted)
-            .Select(w => new WarehouseInfo(w.WarehouseNo, w.WarehouseCode, w.WarehouseName, w.CompanyNo, w.BranchNo))
+            .Select(w => new WarehouseInfo(w.WarehouseNo, w.WarehouseId, w.WarehouseName, w.CompanyNo, w.BranchNo))
             .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyDictionary<long, string>> GetWarehouseNamesAsync(
@@ -60,6 +60,6 @@ internal sealed class InvCatalog : IInvCatalog
                         && (companyNo == null || w.CompanyNo == companyNo)
                         && (branchNo == null || w.BranchNo == branchNo))
             .OrderBy(w => w.WarehouseNo)
-            .Select(w => new WarehouseInfo(w.WarehouseNo, w.WarehouseCode, w.WarehouseName, w.CompanyNo, w.BranchNo))
+            .Select(w => new WarehouseInfo(w.WarehouseNo, w.WarehouseId, w.WarehouseName, w.CompanyNo, w.BranchNo))
             .ToListAsync(cancellationToken);
 }
