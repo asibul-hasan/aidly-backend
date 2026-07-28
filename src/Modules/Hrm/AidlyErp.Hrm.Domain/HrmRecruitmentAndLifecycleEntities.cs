@@ -348,10 +348,12 @@ public class HrmFinalSettlement : AuditEntity, IBranchScopedEntity
     [Column("approval_request_no")]
     public long? ApprovalRequestNo { get; set; }
 
-    [Column("paid_at")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public DateTime? PaidAt { get; set; }
 
-    [Column("paid_by")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public long? PaidBy { get; set; }
 
     [Column("branch_no")]
@@ -379,10 +381,13 @@ public class HrmGradeStep : AuditEntity
     [Column("grade_no")]
     public long GradeNo { get; set; }
 
-    [Column("step_name")]
+    /// <summary>Java calls this column <c>step</c>, not <c>step_name</c>.</summary>
+    [Column("step")]
     [StringLength(50)]
     public string StepName { get; set; } = string.Empty;
 
-    [Column("basic_salary")]
+    /// <summary>Java calls this column <c>amount</c>. <c>basic_salary</c> is a real column on
+    /// <c>hrm_payslip</c>, but not on this table.</summary>
+    [Column("amount")]
     public decimal BasicSalary { get; set; }
 }

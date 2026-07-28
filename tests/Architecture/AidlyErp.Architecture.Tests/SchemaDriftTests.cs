@@ -53,25 +53,25 @@ public class SchemaDriftTests
             return;
         }
 
-        // Real columns, straight from the database.
-        var actual = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        // Real columns and their nullability, straight from the database.
+        var actual = new Dictionary<string, Dictionary<string, bool>>(StringComparer.OrdinalIgnoreCase);
         await using (var conn = new NpgsqlConnection(cs))
         {
             await conn.OpenAsync();
             await using var cmd = new NpgsqlCommand(
-                "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'",
-                conn);
+                "SELECT table_name, column_name, is_nullable FROM information_schema.columns "
+                + "WHERE table_schema = 'public'", conn);
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
                 var table = reader.GetString(0);
                 if (!actual.TryGetValue(table, out var set))
                 {
-                    set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    set = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
                     actual[table] = set;
                 }
 
-                set.Add(reader.GetString(1));
+                set[reader.GetString(1)] = reader.GetString(2) == "YES";
             }
         }
 
@@ -88,6 +88,7 @@ public class SchemaDriftTests
         };
 
         var drift = new List<string>();
+        var nullability = new List<string>();
         var missingTables = new List<string>();
 
         foreach (var ctx in contexts)
@@ -106,9 +107,21 @@ public class SchemaDriftTests
                 foreach (var prop in entity.GetProperties())
                 {
                     var col = prop.GetColumnName();
-                    if (col is not null && !real.Contains(col))
+                    if (col is null) continue;
+
+                    if (!real.TryGetValue(col, out var dbNullable))
                     {
                         drift.Add($"{table}.{col}  ({entity.ClrType.Name}.{prop.Name})");
+                        continue;
+                    }
+
+                    // A non-nullable CLR property over a nullable column throws
+                    // InvalidCastException ("Column 'x' is null") the first time a row actually
+                    // holds a null — invisible to the build and to an existence-only check.
+                    if (dbNullable && !prop.IsNullable)
+                    {
+                        nullability.Add($"{table}.{col}  ({entity.ClrType.Name}.{prop.Name}) "
+                                        + "is NOT NULL in code but NULLABLE in the database");
                     }
                 }
             }
@@ -118,9 +131,11 @@ public class SchemaDriftTests
 
         foreach (var m in missingTables.Distinct().OrderBy(x => x)) _output.WriteLine($"MISSING TABLE  {m}");
         foreach (var d in drift.Distinct().OrderBy(x => x)) _output.WriteLine($"MISSING COLUMN {d}");
+        foreach (var n in nullability.Distinct().OrderBy(x => x)) _output.WriteLine($"NULLABILITY    {n}");
 
-        Assert.True(drift.Count == 0 && missingTables.Count == 0,
+        Assert.True(drift.Count == 0 && missingTables.Count == 0 && nullability.Count == 0,
             $"{drift.Distinct().Count()} mapped columns and {missingTables.Distinct().Count()} tables "
-            + "do not exist in the database. See test output for the full list.");
+            + $"do not exist, and {nullability.Distinct().Count()} columns disagree on nullability. "
+            + "See test output for the full list.");
     }
 }

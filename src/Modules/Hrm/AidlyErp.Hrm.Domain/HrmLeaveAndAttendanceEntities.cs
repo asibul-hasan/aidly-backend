@@ -154,7 +154,7 @@ public class HrmLeaveLedger : AuditEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("ledger_no")]
+    [Column("leave_ledger_no")]
     public long LedgerNo { get; set; }
 
     [Column("employee_no")]
@@ -163,13 +163,13 @@ public class HrmLeaveLedger : AuditEntity
     [Column("leave_type_no")]
     public long LeaveTypeNo { get; set; }
 
-    [Column("trans_date")]
+    [Column("movement_date")]
     public DateTime TransDate { get; set; }
 
     [Column("days")]
     public decimal Days { get; set; }
 
-    [Column("trans_type")]
+    [Column("movement_type")]
     [StringLength(30)]
     public string TransType { get; set; } = string.Empty;
 }
@@ -201,7 +201,7 @@ public class HrmLeavePolicySetup : AuditEntity
     public short? AccrualMethod { get; set; }
 
     [Column("default_days")]
-    public decimal DefaultDays { get; set; }
+    public decimal? DefaultDays { get; set; }
 
     [Column("work_days_per_leave_day")]
     public int? WorkDaysPerLeaveDay { get; set; }
@@ -255,7 +255,8 @@ public class HrmLeaveApplicationRule : AuditEntity
     [Column("policy_no")]
     public long PolicyNo { get; set; }
 
-    [Column("leave_type_no")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public long LeaveTypeNo { get; set; }
 
     [Column("min_duration_per_app")]

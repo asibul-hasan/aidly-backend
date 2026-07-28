@@ -85,7 +85,8 @@ public class HrmPayrollRun : AuditEntity, IBranchScopedEntity
     [NotMapped]
     public long? CompanyNo { get; set; }
 
-    [Column("run_date")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public DateTime? RunDate { get; set; }
 
     [NotMapped]

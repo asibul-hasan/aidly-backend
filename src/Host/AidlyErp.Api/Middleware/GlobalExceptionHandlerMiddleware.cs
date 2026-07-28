@@ -59,6 +59,16 @@ public class GlobalExceptionHandlerMiddleware
 
     private (int StatusCode, object Payload) Translate(Exception exception)
     {
+        // EF wraps anything thrown while evaluating a LINQ query parameter in an
+        // InvalidOperationException. A guard clause inside a query — "No active branch in
+        // context" — therefore reached the client as a 500 instead of the 400 it is. Unwrap so the
+        // status reflects the original fault rather than where it happened to surface.
+        if (exception is InvalidOperationException
+            && exception.InnerException is DomainException inner)
+        {
+            exception = inner;
+        }
+
         switch (exception)
         {
             // --- NotFoundException -> 404 ---

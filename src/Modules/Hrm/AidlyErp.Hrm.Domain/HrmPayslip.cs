@@ -86,13 +86,16 @@ public class HrmPayslip : AuditEntity, IBranchScopedEntity
     [NotMapped]
     public long? CompanyNo { get; set; }
 
-    [Column("payslip_date")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public DateTime? PayslipDate { get; set; }
 
-    [Column("total_days")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public decimal? TotalDays { get; set; }
 
-    [Column("status")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public short Status { get; set; } = 1;
 
     [NotMapped]

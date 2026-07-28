@@ -20,7 +20,7 @@ public class HrmBonusRun : AuditEntity
     [Column("branch_no")]
     public long BranchNo { get; set; }
 
-    [Column("bonus_title")]
+    [Column("bonus_name")]
     [StringLength(100)]
     public string BonusTitle { get; set; } = string.Empty;
 
@@ -112,7 +112,7 @@ public class HrmBonusScopeDesignation : AuditEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("scope_desig_no")]
+    [Column("bonus_scope_designation_no")]
     public long ScopeDesigNo { get; set; }
 
     [Column("bonus_run_no")]
@@ -130,7 +130,7 @@ public class HrmBonusScopeEmployee : AuditEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("scope_emp_no")]
+    [Column("bonus_scope_employee_no")]
     public long ScopeEmpNo { get; set; }
 
     [Column("bonus_run_no")]
@@ -225,7 +225,8 @@ public class HrmPayrollPolicy : AuditEntity
     [StringLength(100)]
     public string PolicyName { get; set; } = string.Empty;
 
-    [Column("overtime_rate")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public decimal OvertimeRate { get; set; } = 1.5m;
 }
 

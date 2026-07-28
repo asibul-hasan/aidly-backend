@@ -483,7 +483,7 @@ public class Hrm1301Service : IHrm1301Service
             var policy = await _db.HrmLeavePolicySetups.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.LeaveTypeNo == type.LeaveTypeNo
                     && p.EmployeeGroupNo == emp.DesignationNo && p.IsDeleted == 0, ct);
-            if (policy != null && policy.DefaultDays > 0) return policy.DefaultDays;
+            if (policy?.DefaultDays > 0) return policy.DefaultDays.Value;
         }
         return type.DefaultDaysPerYear ?? 0;
     }

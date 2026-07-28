@@ -164,7 +164,8 @@ public class HrmHoliday : AuditEntity, IBranchScopedEntity
     [Column("holiday_type")]
     public short? HolidayType { get; set; } = 1;
 
-    [Column("alternate_type")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public short? AlternateType { get; set; }
 
     [Column("is_recurring")]

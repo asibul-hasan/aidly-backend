@@ -71,6 +71,7 @@ public class HrmAttendance : AuditEntity, IBranchScopedEntity
     [NotMapped]
     public decimal WorkingHours { get => WorkedHours; set => WorkedHours = value; }
 
-    [Column("remarks")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public string? Remarks { get; set; }
 }
