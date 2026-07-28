@@ -29,9 +29,9 @@ public interface IAuthService
     /// </summary>
     Task<List<UserContextResponse>> GetUserContextsAsync(string? userId);
 
-    Task<List<Sys.Dto.CompanyDto>> GetCompaniesByUserIdAsync(string? userId);
+    Task<List<AidlyErp.Sys.Application.Dto.CompanyDto>> GetCompaniesByUserIdAsync(string? userId);
 
-    Task<List<Sys.Dto.BranchDto>> GetBranchesByUserIdAsync(string? userId);
+    Task<List<AidlyErp.Sys.Application.Dto.BranchDto>> GetBranchesByUserIdAsync(string? userId);
     FormPermissionResponse GetFormPermission(string formId);
 }
 
@@ -458,7 +458,7 @@ public class AuthService : IAuthService
         }).ToList();
     }
 
-    public async Task<List<Sys.Dto.CompanyDto>> GetCompaniesByUserIdAsync(string? userId)
+    public async Task<List<AidlyErp.Sys.Application.Dto.CompanyDto>> GetCompaniesByUserIdAsync(string? userId)
     {
         var rbac = await ResolveContextsAsync(userId);
 
@@ -468,7 +468,7 @@ public class AuthService : IAuthService
             .Distinct()
             .ToList();
 
-        if (companyNos.Count == 0) return new List<Sys.Dto.CompanyDto>();
+        if (companyNos.Count == 0) return new List<AidlyErp.Sys.Application.Dto.CompanyDto>();
 
         var companies = await _db.Companies
             .AsNoTracking()
@@ -476,7 +476,7 @@ public class AuthService : IAuthService
             .Where(c => companyNos.Contains(c.CompanyNo) && c.IsDeleted == 0)
             .ToListAsync();
 
-        return companies.Select(c => new Sys.Dto.CompanyDto
+        return companies.Select(c => new AidlyErp.Sys.Application.Dto.CompanyDto
         {
             CompanyNo = c.CompanyNo,
             CompanyId = c.CompanyId,
@@ -493,11 +493,11 @@ public class AuthService : IAuthService
         }).ToList();
     }
 
-    public async Task<List<Sys.Dto.BranchDto>> GetBranchesByUserIdAsync(string? userId)
+    public async Task<List<AidlyErp.Sys.Application.Dto.BranchDto>> GetBranchesByUserIdAsync(string? userId)
     {
         var rbac = await ResolveContextsAsync(userId);
 
-        return rbac.Branches.Select(b => new Sys.Dto.BranchDto
+        return rbac.Branches.Select(b => new AidlyErp.Sys.Application.Dto.BranchDto
         {
             BranchNo = b.BranchNo,
             BranchName = b.BranchName,

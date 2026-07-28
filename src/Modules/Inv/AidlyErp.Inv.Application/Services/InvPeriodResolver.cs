@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using AidlyErp.Shared.Core.Abstractions;
 using AidlyErp.Shared.Contracts;
 using AidlyErp.Sys.Contracts;
-using AidlyErp.Sys.Domain;
 
 namespace AidlyErp.Inv.Application.Services;
 

@@ -32,11 +32,11 @@ public class RoleService : IRoleService
     private const short Deleted = 0;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly ILogger<RoleService> _logger;
 
-    public RoleService(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public RoleService(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                        ILogger<RoleService> logger)
     {
         _db = db;

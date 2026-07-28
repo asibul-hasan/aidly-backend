@@ -26,10 +26,10 @@ public interface ILoginAttemptService
 /// </summary>
 public class LoginAttemptService : ILoginAttemptService
 {
-    private readonly ISysDbContextFactory _contextFactory;
+    private readonly IModuleDbContextFactory<ISysDbContext> _contextFactory;
     private readonly ILogger<LoginAttemptService> _logger;
 
-    public LoginAttemptService(ISysDbContextFactory contextFactory, ILogger<LoginAttemptService> logger)
+    public LoginAttemptService(IModuleDbContextFactory<ISysDbContext> contextFactory, ILogger<LoginAttemptService> logger)
     {
         _contextFactory = contextFactory;
         _logger = logger;

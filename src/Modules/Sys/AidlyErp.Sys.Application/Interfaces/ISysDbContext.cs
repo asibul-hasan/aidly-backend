@@ -1,3 +1,5 @@
+using AidlyErp.Shared.Core.Audit;
+using AidlyErp.Shared.Core;
 using AidlyErp.Sys.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -43,6 +45,8 @@ public interface ISysDbContext
     DbSet<Department> Departments { get; }
 
     DbSet<AidlyErp.Shared.Core.EventOutbox> EventOutboxes { get; }
+
+    DbSet<AidlyErp.Shared.Core.Audit.SysAuditLog> SysAuditLogs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 

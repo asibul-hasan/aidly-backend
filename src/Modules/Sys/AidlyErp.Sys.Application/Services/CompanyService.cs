@@ -28,12 +28,12 @@ public class CompanyService : ICompanyService
     private const short Deleted = 0;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly IFileStorage _fileStorage;
     private readonly ILogger<CompanyService> _logger;
 
-    public CompanyService(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public CompanyService(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                           IFileStorage fileStorage, ILogger<CompanyService> logger)
     {
         _db = db;

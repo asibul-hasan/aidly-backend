@@ -47,11 +47,11 @@ public class Sys1003Service : ISys1003Service
     private const short Locked = 3; // period_status = 3 = Locked
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly ILogger<Sys1003Service> _logger;
 
-    public Sys1003Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public Sys1003Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                           ILogger<Sys1003Service> logger)
     {
         _db = db;

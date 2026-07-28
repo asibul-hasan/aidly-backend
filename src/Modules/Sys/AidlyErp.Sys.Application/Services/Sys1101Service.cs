@@ -6,7 +6,6 @@ using AidlyErp.Sys.Application.Interfaces;
 using AidlyErp.Hrm.Contracts;
 using AidlyErp.Shared.Core.Security;
 using AidlyErp.Sys.Application.Dto;
-using AidlyErp.Hrm.Domain;
 using AidlyErp.Sys.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -55,16 +54,19 @@ public class Sys1101Service : ISys1101Service
     private const short Active = 1;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
+    private readonly IEmployeeDirectory _employees;
     private readonly ILogger<Sys1101Service> _logger;
 
-    public Sys1101Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public Sys1101Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
+                          IEmployeeDirectory employees,
                           ILogger<Sys1101Service> logger)
     {
         _db = db;
         _unitOfWork = unitOfWork;
         _ctx = ctx;
+        _employees = employees;
         _logger = logger;
     }
 
@@ -73,73 +75,42 @@ public class Sys1101Service : ISys1101Service
     public async Task<List<Sys1101EmployeeDto>> GetEmployeeListAsync(short? isActive,
                                                                      CancellationToken cancellationToken = default)
     {
-        // Department and designation names are resolved by join, matching the Java
-        // findAllWithFilters query.
-        return await (from e in _db.HrmEmployees.AsNoTracking()
-                      where e.IsDeleted == Deleted && (isActive == null || e.IsActive == isActive)
-                      join d in _db.HrmDepartments.AsNoTracking() on e.DepartmentNo equals d.DepartmentNo into depts
-                      from d in depts.DefaultIfEmpty()
-                      join g in _db.HrmDesignations.AsNoTracking() on e.DesignationNo equals g.DesignationNo into desigs
-                      from g in desigs.DefaultIfEmpty()
-                      orderby e.EmployeeId
-                      select new Sys1101EmployeeDto
-                      {
-                          EmployeeNo = e.EmployeeNo,
-                          EmployeeId = e.EmployeeId,
-                          FullName = BuildFullName(e.FirstName, e.MiddleName, e.LastName),
-                          DepartmentNo = e.DepartmentNo,
-                          DepartmentName = d == null ? null : d.DepartmentName,
-                          DesignationNo = e.DesignationNo,
-                          DesignationName = g == null ? null : g.DesignationName,
-                          IsActive = e.IsActive,
-                          // joining_date is a DATE in the Java contract; the entity stores it as
-                          // DateTime, so narrow it here to keep the JSON shape identical.
-                          JoiningDate = DateOnly.FromDateTime(e.JoiningDate),
-                          OfficialEmail = e.OfficialEmail,
-                          MobileNumber = e.MobileNumber
-                      })
-            .ToListAsync(cancellationToken);
+        // Employees belong to HRM, so they are read through the module contract. The contract
+        // resolves department and designation names by join, exactly as the Java
+        // findAllWithFilters query did.
+        var employees = await _employees.ListAsync(isActive, cancellationToken);
+
+        return employees.Select(ToEmployeeDto).ToList();
     }
 
     public async Task<Sys1101EmployeeDto> GetEmployeeDetailAsync(long employeeNo,
                                                                  CancellationToken cancellationToken = default)
     {
-        var emp = await _db.HrmEmployees
-                      .AsNoTracking()
-                      .FirstOrDefaultAsync(e => e.EmployeeNo == employeeNo && e.IsDeleted == Deleted, cancellationToken)
+        var emp = await _employees.FindAsync(employeeNo, cancellationToken)
                   ?? throw new NotFoundException("Employee not found: employeeNo=" + employeeNo);
 
-        // Resolve department/designation names via direct indexed PK lookups — never by scanning
-        // the whole employee table just to read two names.
-        var deptName = emp.DepartmentNo == null
-            ? null
-            : await _db.HrmDepartments.AsNoTracking()
-                .Where(d => d.DepartmentNo == emp.DepartmentNo && d.IsDeleted == Deleted)
-                .Select(d => d.DepartmentName)
-                .FirstOrDefaultAsync(cancellationToken);
-
-        var desigName = emp.DesignationNo == null
-            ? null
-            : await _db.HrmDesignations.AsNoTracking()
-                .Where(g => g.DesignationNo == emp.DesignationNo && g.IsDeleted == Deleted)
-                .Select(g => g.DesignationName)
-                .FirstOrDefaultAsync(cancellationToken);
-
-        return new Sys1101EmployeeDto
-        {
-            EmployeeNo = emp.EmployeeNo,
-            EmployeeId = emp.EmployeeId,
-            FullName = BuildFullName(emp.FirstName, emp.MiddleName, emp.LastName),
-            DepartmentNo = emp.DepartmentNo,
-            DepartmentName = deptName,
-            DesignationNo = emp.DesignationNo,
-            DesignationName = desigName,
-            IsActive = emp.IsActive,
-            JoiningDate = DateOnly.FromDateTime(emp.JoiningDate),
-            OfficialEmail = emp.OfficialEmail,
-            MobileNumber = emp.MobileNumber
-        };
+        return ToEmployeeDto(emp);
     }
+
+    /// <summary>
+    /// Maps the HRM read model onto this form's DTO. <c>joining_date</c> is a DATE in the Java
+    /// contract but a <c>DateTime</c> on the entity, so it is narrowed here to keep the JSON shape
+    /// identical.
+    /// </summary>
+    private static Sys1101EmployeeDto ToEmployeeDto(EmployeeInfo e) => new()
+    {
+        EmployeeNo = e.EmployeeNo,
+        EmployeeId = e.EmployeeId,
+        FullName = BuildFullName(e.FirstName, e.MiddleName, e.LastName),
+        DepartmentNo = e.DepartmentNo,
+        DepartmentName = e.DepartmentName,
+        DesignationNo = e.DesignationNo,
+        DesignationName = e.DesignationName,
+        IsActive = e.IsActive,
+        JoiningDate = DateOnly.FromDateTime(e.JoiningDate),
+        OfficialEmail = e.OfficialEmail,
+        MobileNumber = e.MobileNumber
+    };
 
     // ─── User Operations ─────────────────────────────────────────────────────
 
@@ -205,10 +176,7 @@ public class Sys1101Service : ISys1101Service
             await _db.SaveChangesAsync(ct);
 
             // The employee now has a login account → reflect it on the HRM employee record.
-            var emp = await _db.HrmEmployees
-                .FirstOrDefaultAsync(e => e.EmployeeNo == user.EmployeeNo && e.IsDeleted == Deleted, ct);
-
-            if (emp != null) await MarkEmployeeHasUserAsync(emp, ct);
+            await _employees.MarkHasUserAsync(user.EmployeeNo, ct);
 
             _logger.LogInformation("User created: userNo={UserNo}, employeeNo={EmployeeNo}",
                 user.UserNo, user.EmployeeNo);
@@ -220,8 +188,7 @@ public class Sys1101Service : ISys1101Service
                                                             CancellationToken cancellationToken = default) =>
         _unitOfWork.ExecuteAsync(async ct =>
         {
-            var emp = await _db.HrmEmployees
-                          .FirstOrDefaultAsync(e => e.EmployeeNo == employeeNo && e.IsDeleted == Deleted, ct)
+            var emp = await _employees.FindAsync(employeeNo, ct)
                       ?? throw new NotFoundException("Employee not found: employeeNo=" + employeeNo);
 
             var existing = await _db.Users
@@ -229,7 +196,7 @@ public class Sys1101Service : ISys1101Service
 
             if (existing != null)
             {
-                await MarkEmployeeHasUserAsync(emp, ct);
+                await _employees.MarkHasUserAsync(employeeNo, ct);
                 return ToUserDto(existing);
             }
 
@@ -252,7 +219,7 @@ public class Sys1101Service : ISys1101Service
                 UserNo = employeeNo,                                       // user no = employee no
                 EmployeeNo = employeeNo,
                 UserId = empId,                                            // username = employee id
-                UserName = BuildFullName(emp),
+                UserName = emp.FullName,
                 CompanyNo = _ctx.CompanyNo,
                 DefaultBranchNo = emp.BranchNo,
                 AccessScope = 1,                                           // BRANCH
@@ -267,7 +234,7 @@ public class Sys1101Service : ISys1101Service
             _db.Users.Add(user);
             await _db.SaveChangesAsync(ct);
 
-            await MarkEmployeeHasUserAsync(emp, ct);
+            await _employees.MarkHasUserAsync(employeeNo, ct);
 
             _logger.LogInformation(
                 "User provisioned from employee: userNo={UserNo}, employeeNo={EmployeeNo}, userId={UserId}",
@@ -377,16 +344,6 @@ public class Sys1101Service : ISys1101Service
 
     // ─── Helper Methods ──────────────────────────────────────────────────────
 
-    /// <summary>Sets <c>hrm_employee.is_create_user = 1</c> (the employee has a login account).</summary>
-    private async Task MarkEmployeeHasUserAsync(HrmEmployee emp, CancellationToken ct)
-    {
-        if (emp.IsCreateUser != 1)
-        {
-            emp.IsCreateUser = 1;
-            await _db.SaveChangesAsync(ct);
-        }
-    }
-
     private static Sys1101UserDto ToUserDto(User user) => new()
     {
         UserNo = user.UserNo,
@@ -402,13 +359,6 @@ public class Sys1101Service : ISys1101Service
         RowVersion = user.RowVersion
         // Password is deliberately never echoed back.
     };
-
-    /// <summary>Falls back to the employee id when every name part is blank.</summary>
-    private static string BuildFullName(HrmEmployee e)
-    {
-        var name = BuildFullName(e.FirstName, e.MiddleName, e.LastName);
-        return string.IsNullOrWhiteSpace(name) ? e.EmployeeId : name;
-    }
 
     private static string BuildFullName(string? first, string? middle, string? last) =>
         string.Join(' ', new[] { first, middle, last }

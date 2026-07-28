@@ -1,3 +1,5 @@
+using AidlyErp.Inv.Contracts;
+using AidlyErp.Shared.Core;
 using AidlyErp.Pur.Application.Interfaces;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -6,11 +8,9 @@ using AidlyErp.Shared.Core.Abstractions;
 using AidlyErp.Shared.Contracts;
 using AidlyErp.Sys.Contracts;
 using AidlyErp.Shared.Core.Security;
-using AidlyErp.Fin.Application.Contract;
-using AidlyErp.Inv.Application.Engine;
+using AidlyErp.Fin.Contracts;
 using AidlyErp.Pur.Application.Dto;
 using AidlyErp.Pur.Domain;
-using AidlyErp.Sys.Domain;
 
 namespace AidlyErp.Pur.Application.Services;
 

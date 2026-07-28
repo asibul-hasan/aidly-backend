@@ -49,11 +49,11 @@ public class Sys1004Service : ISys1004Service
     private static readonly Regex Iso4217 = new("^[A-Z]{3}$", RegexOptions.Compiled);
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly ILogger<Sys1004Service> _logger;
 
-    public Sys1004Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public Sys1004Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                           ILogger<Sys1004Service> logger)
     {
         _db = db;

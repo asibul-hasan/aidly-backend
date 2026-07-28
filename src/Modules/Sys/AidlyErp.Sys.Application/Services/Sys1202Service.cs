@@ -32,11 +32,11 @@ public class Sys1202Service : ISys1202Service
     private const short Deleted = 0;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly ILogger<Sys1202Service> _logger;
 
-    public Sys1202Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public Sys1202Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                           ILogger<Sys1202Service> logger)
     {
         _db = db;

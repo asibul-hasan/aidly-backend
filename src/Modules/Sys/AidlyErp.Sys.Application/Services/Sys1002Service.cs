@@ -6,7 +6,6 @@ using AidlyErp.Sys.Application.Interfaces;
 using AidlyErp.Hrm.Contracts;
 using AidlyErp.Shared.Core.Security;
 using AidlyErp.Sys.Application.Dto;
-using AidlyErp.Hrm.Domain;
 using AidlyErp.Sys.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -23,7 +22,7 @@ public interface ISys1002Service
 
     Task DeleteAsync(long branchNo, CancellationToken cancellationToken = default);
 
-    Task<List<HrmEmployee>> GetEmployeesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<EmployeeInfo>> GetEmployeesAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>Dedicated service for the SYS1002 Branch Setup form.</summary>
@@ -33,16 +32,18 @@ public class Sys1002Service : ISys1002Service
     private const short Deleted = 0;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
+    private readonly IEmployeeDirectory _employees;
     private readonly ILogger<Sys1002Service> _logger;
 
-    public Sys1002Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
-                          ILogger<Sys1002Service> logger)
+    public Sys1002Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
+                          IEmployeeDirectory employees, ILogger<Sys1002Service> logger)
     {
         _db = db;
         _unitOfWork = unitOfWork;
         _ctx = ctx;
+        _employees = employees;
         _logger = logger;
     }
 
@@ -70,12 +71,12 @@ public class Sys1002Service : ISys1002Service
         return (await ToDtosAsync(new[] { entity }, cancellationToken))[0];
     }
 
-    public async Task<List<HrmEmployee>> GetEmployeesAsync(CancellationToken cancellationToken = default) =>
-        await _db.HrmEmployees
-            .AsNoTracking()
-            .Where(e => e.IsActive == Active && e.IsDeleted == Deleted)
-            .OrderBy(e => e.EmployeeId)
-            .ToListAsync(cancellationToken);
+    /// <summary>
+    /// Branch-manager picker. Employee data belongs to HRM, so it is read through the module
+    /// contract rather than by querying <c>hrm_employee</c> from here.
+    /// </summary>
+    public Task<IReadOnlyList<EmployeeInfo>> GetEmployeesAsync(CancellationToken cancellationToken = default) =>
+        _employees.ListAsync(Active, cancellationToken);
 
     // ─── Writes ──────────────────────────────────────────────────────────────
 
@@ -196,16 +197,7 @@ public class Sys1002Service : ISys1002Service
             .Distinct()
             .ToList();
 
-        var managerNames = managerNos.Count == 0
-            ? new Dictionary<long, string>()
-            : await _db.HrmEmployees
-                .AsNoTracking()
-                .Where(e => managerNos.Contains(e.EmployeeNo) && e.IsDeleted == Deleted)
-                .Select(e => new { e.EmployeeNo, e.FirstName, e.LastName })
-                .ToDictionaryAsync(
-                    e => e.EmployeeNo,
-                    e => (e.FirstName + " " + (e.LastName ?? string.Empty)).Trim(),
-                    ct);
+        var managerNames = await _employees.GetNamesAsync(managerNos, ct);
 
         return branches.Select(e =>
         {

@@ -6,7 +6,6 @@ using AidlyErp.Sys.Contracts;
 using AidlyErp.Hrm.Application.Interfaces;
 using AidlyErp.Shared.Core.Security;
 using AidlyErp.Hrm.Application.Dto;
-using AidlyErp.Sys.Domain;
 
 namespace AidlyErp.Hrm.Application.Services;
 

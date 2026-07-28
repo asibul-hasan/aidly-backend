@@ -40,3 +40,12 @@ public interface IUnitOfWork
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Transaction boundary bound to one module's persistence context. Every module owns its own
+/// <c>DbContext</c>, so it owns its own transaction — naming the context in the type makes a
+/// service state which module's unit of work it is joining, and stops DI from silently handing a
+/// Sales handler the Inventory transaction.
+/// </summary>
+/// <typeparam name="TContext">The module's context interface, e.g. <c>ISysDbContext</c>.</typeparam>
+public interface IUnitOfWork<TContext> : IUnitOfWork;

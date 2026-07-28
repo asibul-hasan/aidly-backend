@@ -1,8 +1,8 @@
+using AidlyErp.Shared.Core;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using AidlyErp.Hrm.Domain;
-using AidlyErp.Sys.Domain;
 using AidlyErp.Shared.Core.Abstractions;
 using AidlyErp.Shared.Contracts;
 using AidlyErp.Sys.Contracts;

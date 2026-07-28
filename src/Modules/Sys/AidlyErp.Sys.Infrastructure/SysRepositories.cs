@@ -1,3 +1,4 @@
+using AidlyErp.Shared.Core;
 using AidlyErp.Shared.Core.Abstractions;
 using AidlyErp.Shared.Contracts;
 using AidlyErp.Sys.Contracts;

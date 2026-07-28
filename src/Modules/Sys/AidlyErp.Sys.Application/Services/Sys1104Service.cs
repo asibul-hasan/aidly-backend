@@ -39,12 +39,12 @@ public class Sys1104Service : ISys1104Service
     private const short Deleted = 0;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly IRbacAuthorizationService _rbac;
     private readonly ILogger<Sys1104Service> _logger;
 
-    public Sys1104Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public Sys1104Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                           IRbacAuthorizationService rbac, ILogger<Sys1104Service> logger)
     {
         _db = db;

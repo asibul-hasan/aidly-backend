@@ -29,10 +29,10 @@ public class Sys1007Service : ISys1007Service
     private const short Active = 1;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
 
-    public Sys1007Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx)
+    public Sys1007Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx)
     {
         _db = db;
         _unitOfWork = unitOfWork;

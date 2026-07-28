@@ -33,11 +33,11 @@ public class BranchService : IBranchService
     private const short Deleted = 0;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly ILogger<BranchService> _logger;
 
-    public BranchService(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public BranchService(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                          ILogger<BranchService> logger)
     {
         _db = db;

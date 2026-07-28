@@ -1,3 +1,4 @@
+using AidlyErp.Inv.Contracts;
 using AidlyErp.Inv.Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using AidlyErp.Shared.Core.Exceptions;

@@ -1,6 +1,6 @@
 using AidlyErp.Shared.Core.Abstractions;
 using AidlyErp.Shared.Contracts;
-using AidlyErp.Sys.Contracts;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -11,18 +11,19 @@ namespace AidlyErp.Shared.Infrastructure.Persistence;
 /// transaction is shared by every service resolved for that request — the same reach a Spring
 /// <c>@Transactional</c> boundary has.
 /// </summary>
-public sealed class UnitOfWork : IUnitOfWork
+public sealed class UnitOfWork<TContextInterface, TContext> : IUnitOfWork<TContextInterface>
+    where TContext : ModuleDbContext, TContextInterface
 {
-    private readonly ApplicationDbContext _db;
-    private readonly ILogger<UnitOfWork> _logger;
+    private readonly TContext _db;
+    private readonly ILogger<UnitOfWork<TContextInterface, TContext>> _logger;
 
     /// <summary>
-    /// Set while an unfiltered block is running. <see cref="ApplicationDbContext"/> reads this to
+    /// Set while an unfiltered block is running. <see cref="ModuleDbContext"/> reads this to
     /// bypass the tenant and soft-delete global query filters.
     /// </summary>
     private bool _unfiltered;
 
-    public UnitOfWork(ApplicationDbContext db, ILogger<UnitOfWork> logger)
+    public UnitOfWork(TContext db, ILogger<UnitOfWork<TContextInterface, TContext>> logger)
     {
         _db = db;
         _logger = logger;

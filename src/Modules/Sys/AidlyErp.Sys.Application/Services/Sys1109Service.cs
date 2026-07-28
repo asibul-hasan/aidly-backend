@@ -33,11 +33,11 @@ public class Sys1109Service : ISys1109Service
     private const int DefaultRows = 200;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly ILogger<Sys1109Service> _logger;
 
-    public Sys1109Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public Sys1109Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                           ILogger<Sys1109Service> logger)
     {
         _db = db;

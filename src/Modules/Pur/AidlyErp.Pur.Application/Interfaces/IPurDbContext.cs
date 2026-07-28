@@ -1,3 +1,4 @@
+using AidlyErp.Shared.Core;
 using AidlyErp.Pur.Domain;
 using Microsoft.EntityFrameworkCore;
 

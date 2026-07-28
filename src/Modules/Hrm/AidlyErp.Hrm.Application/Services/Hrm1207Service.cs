@@ -1,3 +1,4 @@
+using AidlyErp.Shared.Core;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using AidlyErp.Shared.Core.Exceptions;
@@ -8,7 +9,6 @@ using AidlyErp.Hrm.Application.Interfaces;
 using AidlyErp.Shared.Core.Security;
 using AidlyErp.Hrm.Application.Dto;
 using AidlyErp.Hrm.Domain;
-using AidlyErp.Sys.Domain;
 
 namespace AidlyErp.Hrm.Application.Services;
 

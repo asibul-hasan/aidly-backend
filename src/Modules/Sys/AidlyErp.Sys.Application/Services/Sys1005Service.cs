@@ -43,11 +43,11 @@ public class Sys1005Service : ISys1005Service
     private const decimal MaxRate = 100m;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly ILogger<Sys1005Service> _logger;
 
-    public Sys1005Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public Sys1005Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                           ILogger<Sys1005Service> logger)
     {
         _db = db;

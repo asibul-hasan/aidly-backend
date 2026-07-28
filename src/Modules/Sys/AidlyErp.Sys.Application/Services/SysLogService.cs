@@ -14,9 +14,9 @@ namespace AidlyErp.Sys.Application.Services;
 /// </summary>
 public class SysLogService : ISysLogService
 {
-    private readonly ISysDbContextFactory _dbFactory;
+    private readonly IModuleDbContextFactory<ISysDbContext> _dbFactory;
 
-    public SysLogService(ISysDbContextFactory dbFactory) => _dbFactory = dbFactory;
+    public SysLogService(IModuleDbContextFactory<ISysDbContext> dbFactory) => _dbFactory = dbFactory;
 
     public async Task LogRequestAsync(
         string httpMethod,

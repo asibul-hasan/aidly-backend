@@ -1,3 +1,4 @@
+using AidlyErp.Inv.Contracts;
 using AidlyErp.Inv.Application.Interfaces;
 using AidlyErp.Shared.Core.Exceptions;
 using AidlyErp.Shared.Core.Abstractions;

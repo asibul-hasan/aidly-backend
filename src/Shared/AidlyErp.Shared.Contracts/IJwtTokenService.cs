@@ -1,6 +1,6 @@
 using AidlyErp.Shared.Core;
 
-namespace AidlyErp.Sys.Application.Auth.Services;
+namespace AidlyErp.Shared.Contracts;
 
 /// <summary>
 /// Principal carried in the JWT. The .NET counterpart of Java's <c>AidlyUserDetails</c>

@@ -32,12 +32,12 @@ public class MenuService : IMenuService
     private const short Deleted = 0;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly IPathFormCacheInvalidator _pathFormCache;
     private readonly ILogger<MenuService> _logger;
 
-    public MenuService(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public MenuService(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                        IPathFormCacheInvalidator pathFormCache, ILogger<MenuService> logger)
     {
         _db = db;

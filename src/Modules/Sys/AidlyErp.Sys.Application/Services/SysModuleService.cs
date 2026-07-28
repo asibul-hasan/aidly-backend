@@ -26,11 +26,11 @@ public class SysModuleService : ISysModuleService
     private const short Deleted = 0;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly ILogger<SysModuleService> _logger;
 
-    public SysModuleService(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public SysModuleService(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                             ILogger<SysModuleService> logger)
     {
         _db = db;

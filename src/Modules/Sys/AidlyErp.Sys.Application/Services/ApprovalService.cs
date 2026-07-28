@@ -30,13 +30,13 @@ public class ApprovalService : IApprovalService
     public const short StatusPending = ReqPending, StatusApproved = ReqApproved, StatusRejected = ReqRejected;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly ICurrentPermissionContext _permissionContext;
     private readonly IEnumerable<IApprovalCompletedListener> _listeners;
     private readonly ILogger<ApprovalService> _logger;
 
-    public ApprovalService(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public ApprovalService(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                            ICurrentPermissionContext permissionContext,
                            IEnumerable<IApprovalCompletedListener> listeners,
                            ILogger<ApprovalService> logger)

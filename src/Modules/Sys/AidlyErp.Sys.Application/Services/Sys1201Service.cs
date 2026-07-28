@@ -50,11 +50,11 @@ public class Sys1201Service : ISys1201Service
     private const int OrderSlNullsLast = int.MaxValue;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly IPathFormCacheInvalidator _pathFormCache;
 
-    public Sys1201Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public Sys1201Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                           IPathFormCacheInvalidator pathFormCache)
     {
         _db = db;

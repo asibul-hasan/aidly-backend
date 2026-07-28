@@ -31,10 +31,10 @@ public class Sys1108Service : ISys1108Service
     private const short Deleted = 0;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
 
-    public Sys1108Service(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx)
+    public Sys1108Service(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx)
     {
         _db = db;
         _unitOfWork = unitOfWork;

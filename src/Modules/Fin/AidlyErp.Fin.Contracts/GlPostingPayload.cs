@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AidlyErp.Fin.Application.Contract;
+namespace AidlyErp.Fin.Contracts;
 
 /// <summary>
 /// The standard sys_event_outbox payload contract for GL posting.

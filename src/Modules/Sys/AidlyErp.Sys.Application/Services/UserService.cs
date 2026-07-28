@@ -37,11 +37,11 @@ public class UserService : IUserService
     private const short Deleted = 0;
 
     private readonly ISysDbContext _db;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
     private readonly ILogger<UserService> _logger;
 
-    public UserService(ISysDbContext db, IUnitOfWork unitOfWork, ICompanyBranchContext ctx,
+    public UserService(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                        ILogger<UserService> logger)
     {
         _db = db;
