@@ -11,7 +11,8 @@ public class AuthRoleDto
     [JsonPropertyName("role_name")]
     public string? RoleName { get; set; }
 
-    [JsonPropertyName("is_default")]
+    /// <summary>Serialised as <c>primary_role</c> to match Java's <c>AuthRoleDto</c>.</summary>
+    [JsonPropertyName("primary_role")]
     public short IsDefault { get; set; }
 
     public AuthRoleDto() { }
@@ -52,7 +53,9 @@ public class MenuItemDto
     [JsonPropertyName("type")]
     public string? Type { get; set; }
 
-    [JsonPropertyName("name")]
+    /// <summary>Serialised as <c>form_name</c> — Java's MenuItemDto uses that name and the
+    /// sidebar reads it. Renaming it left every menu label blank.</summary>
+    [JsonPropertyName("form_name")]
     public string? Name { get; set; }
 
     [JsonPropertyName("icon")]
@@ -68,13 +71,14 @@ public class MenuItemDto
     [JsonPropertyName("code")]
     public string? Code { get; set; }
 
-    [JsonPropertyName("submodule")]
+    /// <summary>Serialised as <c>sub_module</c> to match Java; the sidebar groups on it.</summary>
+    [JsonPropertyName("sub_module")]
     public string? Submodule { get; set; }
 
     [JsonPropertyName("module_icon")]
     public string? ModuleIcon { get; set; }
 
-    [JsonPropertyName("submodule_icon")]
+    [JsonPropertyName("sub_module_icon")]
     public string? SubmoduleIcon { get; set; }
 
     [JsonPropertyName("module_serial")]
