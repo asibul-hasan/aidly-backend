@@ -38,6 +38,7 @@ public class Hrm1301Service : IHrm1301Service
 {
     private readonly IHrmDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly IApprovalRequestReader _approvals;
     private readonly ILeaveRuleEngine _ruleEngine;
     private readonly IApprovalService _approvalService;
 
@@ -45,11 +46,12 @@ public class Hrm1301Service : IHrm1301Service
     private const short StDraft = 1, StApplied = 2, StApproved = 3, StRejected = 4, StCancelled = 5;
 
     public Hrm1301Service(IHrmDbContext db, ICompanyBranchContext ctx,
-        ILeaveRuleEngine ruleEngine, IApprovalService approvalService)
+        ILeaveRuleEngine ruleEngine, IApprovalService approvalService, IApprovalRequestReader approvals)
     {
         _db = db;
         _ctx = ctx;
         _ruleEngine = ruleEngine;
+        _approvals = approvals;
         _approvalService = approvalService;
     }
 
@@ -518,9 +520,8 @@ public class Hrm1301Service : IHrm1301Service
     private async Task<bool> IsApprovalUntouchedAsync(long? approvalRequestNo, CancellationToken ct)
     {
         if (!approvalRequestNo.HasValue) return true;
-        var request = await _db.ApprovalRequests.AsNoTracking()
-            .FirstOrDefaultAsync(r => r.ApprovalRequestNo == approvalRequestNo.Value, ct);
-        return request == null || request.Status == 1; // Pending = untouched
+        var status = await _approvals.GetStatusAsync(approvalRequestNo.Value, ct);
+        return status == null || status == 1; // Pending = untouched
     }
 
     private long ResolveBranch(long? branchNoFromDto)

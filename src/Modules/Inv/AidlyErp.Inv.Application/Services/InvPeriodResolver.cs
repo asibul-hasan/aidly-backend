@@ -1,31 +1,42 @@
-using AidlyErp.Inv.Application.Interfaces;
-using Microsoft.EntityFrameworkCore;
-using AidlyErp.Shared.Core.Abstractions;
-using AidlyErp.Shared.Contracts;
 using AidlyErp.Sys.Contracts;
 
 namespace AidlyErp.Inv.Application.Services;
 
 public interface IInvPeriodResolver
 {
-    Task<FinYear> ResolveOpenFinYearAsync(long branchNo, DateTime date, CancellationToken ct = default);
+    Task<FinYearInfo> ResolveOpenFinYearAsync(long branchNo, DateTime date, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Resolves the fiscal year a stock movement falls into. The calendar is SYS master data, so it is
+/// read through <see cref="IFinCalendar"/> rather than by querying <c>sys_fin_year</c> from INV.
+/// </summary>
 public class InvPeriodResolver : IInvPeriodResolver
 {
-    private readonly IInvDbContext _db;
+    private readonly IFinCalendar _calendar;
 
-    public InvPeriodResolver(IInvDbContext db) => _db = db;
+    public InvPeriodResolver(IFinCalendar calendar) => _calendar = calendar;
 
-    public async Task<FinYear> ResolveOpenFinYearAsync(long branchNo, DateTime date, CancellationToken ct = default)
+    public async Task<FinYearInfo> ResolveOpenFinYearAsync(long branchNo, DateTime date,
+                                                           CancellationToken ct = default)
     {
-        DateOnly targetDate = DateOnly.FromDateTime(date);
-        var year = await _db.FinYears
-            .FirstOrDefaultAsync(y => y.IsActive == 1 && y.IsDeleted == 0 && y.StartDate <= targetDate && y.EndDate >= targetDate, ct);
+        var targetDate = DateOnly.FromDateTime(date);
 
-        if (year != null) return year;
+        var year = await _calendar.FindActiveYearForDateAsync(targetDate, ct)
+                   ?? await _calendar.FindAnyActiveYearAsync(ct);
 
-        year = await _db.FinYears.FirstOrDefaultAsync(y => y.IsActive == 1 && y.IsDeleted == 0, ct);
-        return year ?? new FinYear { FinYearNo = 1, YearName = $"{DateTime.UtcNow.Year}", StartDate = new DateOnly(DateTime.UtcNow.Year, 1, 1), EndDate = new DateOnly(DateTime.UtcNow.Year, 12, 31) };
+        // Same last-resort fallback as before: a synthetic calendar year, so posting never hard-fails
+        // purely because no fiscal year has been configured yet.
+        return year ?? new FinYearInfo(
+            FinYearNo: 1,
+            CompanyNo: 0,
+            FinYearId: string.Empty,
+            FinYearName: $"{DateTime.UtcNow.Year}",
+            YearName: $"{DateTime.UtcNow.Year}",
+            StartDate: new DateOnly(DateTime.UtcNow.Year, 1, 1),
+            EndDate: new DateOnly(DateTime.UtcNow.Year, 12, 31),
+            YearStatus: 1,
+            IsClosed: 0,
+            BranchNo: null);
     }
 }

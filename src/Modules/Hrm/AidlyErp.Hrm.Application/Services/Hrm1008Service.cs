@@ -26,6 +26,7 @@ public class Hrm1008Service : IHrm1008Service
 {
     private readonly IHrmDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly ISysSettingsStore _settings;
     private const string Group = "HR";
 
     // Setting keys
@@ -43,7 +44,8 @@ public class Hrm1008Service : IHrm1008Service
     private const string KFest = "hr.enable_festival_bonus";
     private const string KMat = "hr.maternity_weeks";
 
-    public Hrm1008Service(IHrmDbContext db, ICompanyBranchContext ctx) { _db = db; _ctx = ctx; }
+    public Hrm1008Service(IHrmDbContext db, ICompanyBranchContext ctx, ISysSettingsStore settings)
+        { _db = db; _ctx = ctx; _settings = settings; }
 
     public async Task<Hrm1008SettingsDto> GetSettingsAsync(CancellationToken ct = default)
     {
@@ -90,34 +92,12 @@ public class Hrm1008Service : IHrm1008Service
     private async Task UpsertAsync(long companyNo, string key, string? value, short valueType, string description, CancellationToken ct)
     {
         if (value == null) return; // Leave existing/default untouched.
-        var entity = await _db.Settings.FirstOrDefaultAsync(s => s.CompanyNo == companyNo && s.SettingKey == key && s.IsDeleted == 0, ct);
-        if (entity == null)
-        {
-            entity = new Setting
-            {
-                CompanyNo = companyNo,
-                SettingKey = key,
-                SettingGroup = Group,
-                IsActive = 1,
-                IsDeleted = 0,
-                CreatedBy = _ctx.CurrentUserNo(),
-                CreatedAt = DateTime.UtcNow
-            };
-            _db.Settings.Add(entity);
-        }
-        entity.SettingValue = value;
-        entity.ValueType = valueType;
-        if (entity.SettingGroup == null) entity.SettingGroup = Group;
-        if (entity.Description == null) entity.Description = description;
-        entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        await _settings.UpsertAsync(companyNo, key, value, valueType, Group, description, ct);
     }
 
     private async Task<string> GetStrAsync(long companyNo, string key, string defaultValue, CancellationToken ct)
     {
-        var setting = await _db.Settings.AsNoTracking()
-            .FirstOrDefaultAsync(s => s.CompanyNo == companyNo && s.SettingKey == key && s.IsDeleted == 0, ct);
-        var value = setting?.SettingValue;
+        var value = await _settings.GetAsync(companyNo, key, ct);
         return !string.IsNullOrWhiteSpace(value) ? value : defaultValue;
     }
 

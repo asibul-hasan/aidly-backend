@@ -25,31 +25,28 @@ public class Fin1401Service : IFin1401Service
 {
     private readonly IFinDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly IFinCalendar _calendar;
     private readonly IFinReportService _reportService;
     private readonly IFin1101Service _voucherService;
 
-    public Fin1401Service(IFinDbContext db, ICompanyBranchContext ctx, IFinReportService reportService, IFin1101Service voucherService)
+    public Fin1401Service(IFinDbContext db, ICompanyBranchContext ctx, IFinReportService reportService, IFin1101Service voucherService,
+                          IFinCalendar calendar)
     {
         _db = db;
         _ctx = ctx;
         _reportService = reportService;
         _voucherService = voucherService;
+        _calendar = calendar;
     }
 
     public async Task<List<Fin1401YearDto>> GetYearsAndPeriodsAsync(CancellationToken ct = default)
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? 0;
 
-        var years = await _db.FinYears.AsNoTracking()
-            .Where(y => y.CompanyNo == companyNo && y.IsDeleted == 0)
-            .OrderByDescending(y => y.StartDate)
-            .ToListAsync(ct);
+        var years = await _calendar.ListYearsAsync(companyNo, ct);
 
         var yearNos = years.Select(y => y.FinYearNo).ToList();
-        var periods = await _db.FinYearDtls.AsNoTracking()
-            .Where(p => yearNos.Contains(p.FinYearNo) && p.IsDeleted == 0)
-            .OrderBy(p => p.StartDate)
-            .ToListAsync(ct);
+        var periods = await _calendar.ListPeriodsAsync(yearNos, ct);
 
         var result = new List<Fin1401YearDto>();
 
@@ -81,17 +78,15 @@ public class Fin1401Service : IFin1401Service
 
     public async Task ClosePeriodAsync(long periodNo, CancellationToken ct = default)
     {
-        var period = await _db.FinYearDtls.FirstOrDefaultAsync(p => p.FinPeriodNo == periodNo && p.IsDeleted == 0, ct)
+        _ = await _calendar.FindPeriodAsync(periodNo, ct)
             ?? throw new NotFoundException($"Period not found: {periodNo}");
 
-        period.PeriodStatus = 2; // Closed
-        period.UpdatedBy = _ctx.CurrentUserNo(); period.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        await _calendar.ClosePeriodAsync(periodNo, _ctx.CurrentUserNo(), ct);
     }
 
     public async Task<Fin1401CloseResultDto> CloseFiscalYearAsync(Fin1401CloseRequestDto request, CancellationToken ct = default)
     {
-        var year = await _db.FinYears.FirstOrDefaultAsync(y => y.FinYearNo == request.FinYearNo && y.IsDeleted == 0, ct)
+        var year = await _calendar.FindYearAsync(request.FinYearNo, ct)
             ?? throw new NotFoundException($"Fiscal Year not found: {request.FinYearNo}");
 
         if (year.YearStatus == 2) throw new ValidationException("Fiscal Year is already closed");
@@ -145,9 +140,8 @@ public class Fin1401Service : IFin1401Service
             if (v != null) voucherId = v.VoucherId;
         }
 
-        year.YearStatus = 2; // Closed
-        year.UpdatedBy = _ctx.CurrentUserNo(); year.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        // The fiscal calendar is SYS-owned, so the close is applied through the contract.
+        await _calendar.CloseYearAsync(year.FinYearNo, _ctx.CurrentUserNo(), ct);
 
         return new Fin1401CloseResultDto
         {

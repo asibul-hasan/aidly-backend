@@ -37,6 +37,8 @@ public class Hrm1207Service : IHrm1207Service
 {
     private readonly IHrmDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly ISysBranchDirectory _branches;
+    private readonly IDocSequenceGenerator _docSequences;
     private readonly IApprovalService _approvalService;
 
     public const string DocType = "HRM_SETTLEMENT";
@@ -47,11 +49,14 @@ public class Hrm1207Service : IHrm1207Service
     private const short RunRegular = 1, RunSupplementary = 2, RunBonus = 3;
     private const short PayslipPaid = 2;
 
-    public Hrm1207Service(IHrmDbContext db, ICompanyBranchContext ctx, IApprovalService approvalService)
+    public Hrm1207Service(IHrmDbContext db, ICompanyBranchContext ctx, IApprovalService approvalService,
+                          ISysBranchDirectory branches, IDocSequenceGenerator docSequences)
     {
         _db = db;
         _ctx = ctx;
         _approvalService = approvalService;
+        _branches = branches;
+        _docSequences = docSequences;
     }
 
     // ── Reads ──────────────────────────────────────────────────────────────
@@ -341,7 +346,7 @@ public class Hrm1207Service : IHrm1207Service
     {
         long? branchNo = branchNoFromDto ?? employee.BranchNo ?? _ctx.BranchNo;
         if (!branchNo.HasValue) throw new ValidationException("Branch is required");
-        var branch = await _db.Branches.AsNoTracking().FirstOrDefaultAsync(b => b.BranchNo == branchNo.Value && b.IsDeleted == 0, ct)
+        var branch = await _branches.FindAsync(branchNo.Value, ct)
             ?? throw new NotFoundException($"Branch not found: branchNo={branchNo}");
         if (employee.BranchNo.HasValue && employee.BranchNo.Value != branchNo.Value)
             throw new ValidationException("Employee belongs to another branch");
@@ -368,38 +373,17 @@ public class Hrm1207Service : IHrm1207Service
 
     private async Task<string> NextSettlementIdAsync(long branchNo, DateTime lastWorkingDay, CancellationToken ct)
     {
-        var branch = await _db.Branches.AsNoTracking().FirstOrDefaultAsync(b => b.BranchNo == branchNo && b.IsDeleted == 0, ct)
+        var branch = await _branches.FindAsync(branchNo, ct)
             ?? throw new NotFoundException($"Branch not found: branchNo={branchNo}");
 
         string stamp = lastWorkingDay.ToString("MMyy");
         string docType = $"{DocType}_{stamp}";
         string prefix = $"FS{stamp}";
 
-        var seq = await _db.DocSequences.FirstOrDefaultAsync(
-            s => s.CompanyNo == branch.CompanyNo && s.BranchNo == branchNo && s.DocType == docType, ct);
-
-        if (seq == null)
-        {
-            seq = new DocSequence
-            {
-                CompanyNo = branch.CompanyNo ?? 0,
-                BranchNo = branchNo,
-                DocType = docType,
-                Prefix = prefix,
-                NextVal = 2,
-                IsDeleted = 0,
-                CreatedBy = _ctx.CurrentUserNo(),
-                CreatedAt = DateTime.UtcNow
-            };
-            _db.DocSequences.Add(seq);
-            await _db.SaveChangesAsync(ct);
-            return $"{prefix}0001";
-        }
-
-        long current = seq.NextVal;
-        seq.NextVal = current + 1;
-        await _db.SaveChangesAsync(ct);
-        return $"{seq.Prefix ?? prefix}{current:D4}";
+        // Document numbering is SYS master data (sys_doc_sequence) — allocated through the
+        // contract, which creates the sequence row on first use exactly as this did inline.
+        return await _docSequences.NextAsync(branch.CompanyNo ?? 0, branchNo, docType, prefix,
+            width: 4, cancellationToken: ct);
     }
 
     private static decimal NonNeg(decimal value, string field) =>
@@ -438,7 +422,9 @@ public class Hrm1207Service : IHrm1207Service
             long companyNo = _ctx.CurrentCompanyNo() ?? 0;
             if (companyNo == 0)
             {
-                var branch = await _db.Branches.AsNoTracking().FirstOrDefaultAsync(b => b.BranchNo == settlement.BranchNo && b.IsDeleted == 0, ct);
+                var branch = settlement.BranchNo == null
+                    ? null
+                    : await _branches.FindAsync(settlement.BranchNo.Value, ct);
                 companyNo = branch?.CompanyNo ?? 0;
             }
             if (companyNo == 0) return;

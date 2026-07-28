@@ -33,16 +33,18 @@ public class Fin1101Service : IFin1101Service
 {
     private readonly IFinDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly IFinCalendar _calendar;
     private readonly IApprovalService _approvalService;
 
     public const string DocType = "FIN_VOUCHER";
     private const short StDraft = 1, StPosted = 2, StCancelled = 3;
 
-    public Fin1101Service(IFinDbContext db, ICompanyBranchContext ctx, IApprovalService approvalService)
+    public Fin1101Service(IFinDbContext db, ICompanyBranchContext ctx, IApprovalService approvalService, IFinCalendar calendar)
     {
         _db = db;
         _ctx = ctx;
         _approvalService = approvalService;
+        _calendar = calendar;
     }
 
     public async Task<List<Fin1101VoucherDto>> GetListAsync(long? typeNo, DateTime? fromDate, DateTime? toDate, string? search, CancellationToken ct = default)
@@ -101,10 +103,10 @@ public class Fin1101Service : IFin1101Service
         // sys_fin_year(_dtl).start_date/end_date are DATE columns (DateOnly).
         var voucherDay = DateOnly.FromDateTime(dto.VoucherDate);
 
-        var finYear = await _db.FinYears.FirstOrDefaultAsync(y => y.CompanyNo == companyNo && y.StartDate <= voucherDay && y.EndDate >= voucherDay && y.IsDeleted == 0, ct)
+        var finYear = await _calendar.FindYearForDateAsync(companyNo, voucherDay, ct)
             ?? throw new ValidationException($"No financial year configured for date {dto.VoucherDate:yyyy-MM-dd}");
 
-        var finPeriod = await _db.FinYearDtls.FirstOrDefaultAsync(p => p.FinYearNo == finYear.FinYearNo && p.StartDate <= voucherDay && p.EndDate >= voucherDay && p.IsDeleted == 0, ct)
+        var finPeriod = await _calendar.FindPeriodForDateAsync(finYear.FinYearNo, voucherDay, ct)
             ?? throw new ValidationException($"No financial period configured for date {dto.VoucherDate:yyyy-MM-dd}");
 
         decimal totalDebit = dto.Lines.Sum(l => l.Debit);

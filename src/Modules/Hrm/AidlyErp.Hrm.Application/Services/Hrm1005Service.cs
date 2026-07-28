@@ -30,10 +30,12 @@ public class Hrm1005Service : IHrm1005Service
 {
     private readonly IHrmDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly ISysBranchDirectory _branches;
     private const short Active = 1;
     private const short Deleted = 0;
 
-    public Hrm1005Service(IHrmDbContext db, ICompanyBranchContext ctx) { _db = db; _ctx = ctx; }
+    public Hrm1005Service(IHrmDbContext db, ICompanyBranchContext ctx, ISysBranchDirectory branches)
+        { _db = db; _ctx = ctx; _branches = branches; }
 
     // ── Reads ──────────────────────────────────────────────────────────────
 
@@ -257,7 +259,7 @@ public class Hrm1005Service : IHrm1005Service
     {
         long? branchNo = branchNoFromDto ?? _ctx.BranchNo;
         if (!branchNo.HasValue) throw new ValidationException("Branch is required");
-        var exists = await _db.Branches.AnyAsync(b => b.BranchNo == branchNo.Value && b.IsDeleted == Deleted, ct);
+        var exists = await _branches.ExistsAsync(branchNo.Value, ct);
         if (!exists) throw new NotFoundException($"Branch not found: branchNo={branchNo}");
         return branchNo.Value;
     }
