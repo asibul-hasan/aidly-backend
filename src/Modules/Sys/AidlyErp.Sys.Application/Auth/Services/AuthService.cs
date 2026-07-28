@@ -410,14 +410,14 @@ public class AuthService : IAuthService
 
     public async Task<List<UserContextResponse>> GetUserContextsAsync(string? userId)
     {
-        var rbac = await ResolveContextsAsync(userId);
+        var branches = await ResolveAccessibleBranchesAsync(userId);
 
         // Group the user's branches by company, preserving the order RBAC returned them in
         // (default branch first) so the picker's first option is the sensible default.
         var byCompany = new Dictionary<long, List<Dto.BranchDto>>();
         var order = new List<long>();
 
-        foreach (var b in rbac.Branches)
+        foreach (var b in branches)
         {
             if (b.CompanyNo == null) continue;
 
@@ -433,14 +433,13 @@ public class AuthService : IAuthService
 
         return order.Select(companyNo =>
         {
-            var branches = byCompany[companyNo];
+            var list = byCompany[companyNo];
 
             return new UserContextResponse
             {
                 CompanyNo = companyNo,
-                CompanyName = branches.Select(b => b.CompanyName).FirstOrDefault(n => n != null)
-                              ?? rbac.CompanyName,
-                Branches = branches
+                CompanyName = list.Select(b => b.CompanyName).FirstOrDefault(n => n != null),
+                Branches = list
                     .Select(b => new UserContextBranchDto(b.BranchNo, b.BranchName))
                     .ToList()
             };
@@ -449,9 +448,9 @@ public class AuthService : IAuthService
 
     public async Task<List<AidlyErp.Sys.Application.Dto.CompanyDto>> GetCompaniesByUserIdAsync(string? userId)
     {
-        var rbac = await ResolveContextsAsync(userId);
+        var branches = await ResolveAccessibleBranchesAsync(userId);
 
-        var companyNos = rbac.Branches
+        var companyNos = branches
             .Where(b => b.CompanyNo != null)
             .Select(b => b.CompanyNo!.Value)
             .Distinct()
@@ -484,9 +483,9 @@ public class AuthService : IAuthService
 
     public async Task<List<AidlyErp.Sys.Application.Dto.BranchDto>> GetBranchesByUserIdAsync(string? userId)
     {
-        var rbac = await ResolveContextsAsync(userId);
+        var branches = await ResolveAccessibleBranchesAsync(userId);
 
-        return rbac.Branches.Select(b => new AidlyErp.Sys.Application.Dto.BranchDto
+        return branches.Select(b => new AidlyErp.Sys.Application.Dto.BranchDto
         {
             BranchNo = b.BranchNo,
             BranchName = b.BranchName,
@@ -498,10 +497,17 @@ public class AuthService : IAuthService
 
     /// <summary>
     /// Shared prologue for the three pre-login lookups: resolve the login id to a live account,
-    /// then resolve its RBAC session. Every failure reports the same generic message so this
-    /// unauthenticated endpoint cannot be used to enumerate valid user ids.
+    /// then list every branch it can reach — across ALL companies.
+    ///
+    /// <para>These endpoints feed the login screen's company/branch picker, so they must not use
+    /// the session context: <c>RbacSessionContext.Branches</c> is narrowed to the active company,
+    /// which meant a user with branches in two companies was only ever offered one of them (and
+    /// which one depended on the ORDER BY, so it could change between restarts).</para>
+    ///
+    /// <para>Every failure reports the same generic message so this unauthenticated endpoint
+    /// cannot be used to enumerate valid user ids.</para>
     /// </summary>
-    private async Task<RbacSessionContext> ResolveContextsAsync(string? userId)
+    private async Task<List<BranchDto>> ResolveAccessibleBranchesAsync(string? userId)
     {
         if (string.IsNullOrWhiteSpace(userId))
         {
@@ -519,6 +525,6 @@ public class AuthService : IAuthService
             throw new ValidationException("INVALID_CREDENTIALS");
         }
 
-        return await _rbacService.ResolveSessionAsync(user.UserNo, null);
+        return await _rbacService.ResolveAccessibleBranchesAsync(user.UserNo);
     }
 }

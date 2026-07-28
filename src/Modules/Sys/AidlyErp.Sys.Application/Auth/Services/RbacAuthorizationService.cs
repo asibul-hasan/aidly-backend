@@ -20,6 +20,18 @@ public interface IRbacAuthorizationService
     Task<RbacSessionContext> ResolveSessionAsync(long userNo, long? requestedBranchNo,
                                                  CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Every branch the user can reach, across ALL companies — the list the pre-login company /
+    /// branch picker needs.
+    ///
+    /// <para>This is deliberately NOT <see cref="RbacSessionContext.Branches"/>. That list is
+    /// narrowed to the active session's company, which is right for the in-app branch switcher
+    /// (you switch branch within a company, not across one) but wrong for discovery: a user with
+    /// branches in two companies could only ever be offered whichever company happened to sort
+    /// first.</para>
+    /// </summary>
+    Task<List<BranchDto>> ResolveAccessibleBranchesAsync(long userNo, CancellationToken cancellationToken = default);
+
     Task<FormPermissionResponse> GetFormPermissionAsync(long userNo, long? companyNo, long? branchNo, string formId,
                                                         CancellationToken cancellationToken = default);
 
@@ -80,6 +92,53 @@ public class RbacAuthorizationService : IRbacAuthorizationService
     // =========================================================================
     // Session resolution
     // =========================================================================
+
+    /// <inheritdoc />
+    public async Task<List<BranchDto>> ResolveAccessibleBranchesAsync(long userNo,
+                                                                      CancellationToken cancellationToken = default)
+    {
+        var (_, branchOrder, branchMap) = await CollectBranchesAsync(userNo, cancellationToken);
+        return branchOrder.Select(no => branchMap[no]).ToList();
+    }
+
+    /// <summary>
+    /// The user's branches from both sources, de-duplicated and in priority order (default branch
+    /// first). Shared by session resolution and by discovery so the two can never disagree about
+    /// what a user can reach.
+    /// </summary>
+    private async Task<(List<RoleAccessProjection> RoleRows, List<long> Order, Dictionary<long, BranchDto> Map)>
+        CollectBranchesAsync(long userNo, CancellationToken cancellationToken)
+    {
+        var roleRows = await FindRoleAccessForUserAsync(userNo, cancellationToken);
+
+        var branchMap = new Dictionary<long, BranchDto>();
+        var branchOrder = new List<long>();
+
+        foreach (var r in roleRows)
+        {
+            if (r.BranchNo == null || branchMap.ContainsKey(r.BranchNo.Value)) continue;
+            branchMap[r.BranchNo.Value] = ToBranchDto(r);
+            branchOrder.Add(r.BranchNo.Value);
+        }
+
+        // Augment with branches the user is a member of via sys_user_branch (even if the join
+        // above filtered a row out for any reason).
+        foreach (var ub in await FindBranchesForUserAsync(userNo, cancellationToken))
+        {
+            if (ub.BranchNo == null || branchMap.ContainsKey(ub.BranchNo.Value)) continue;
+            branchMap[ub.BranchNo.Value] = new BranchDto
+            {
+                BranchNo = ub.BranchNo,
+                BranchName = ub.BranchName,
+                CompanyNo = ub.CompanyNo,
+                CompanyName = ub.CompanyName,
+                IsActive = 1
+            };
+            branchOrder.Add(ub.BranchNo.Value);
+        }
+
+        return (roleRows, branchOrder, branchMap);
+    }
 
     public async Task<RbacSessionContext> ResolveSessionAsync(long userNo, long? requestedBranchNo,
                                                               CancellationToken cancellationToken = default)
