@@ -627,7 +627,7 @@ public class DocSequenceRepository : IDocSequenceRepository
     public DocSequenceRepository(ISysDbContext db) => _db = db;
 
     public async Task<DocSequence?> FindByIdAsync(long docSeqNo, CancellationToken ct = default) =>
-        await _db.DocSequences.FirstOrDefaultAsync(x => x.DocSeqNo == docSeqNo && x.IsDeleted == Deleted, ct);
+        await _db.DocSequences.FirstOrDefaultAsync(x => x.DocSeqNo == docSeqNo, ct);
 
     /// <summary>
     /// <c>SELECT … FOR UPDATE</c> — the row lock is the whole point: two documents created
@@ -642,7 +642,6 @@ public class DocSequenceRepository : IDocSequenceRepository
                 WHERE  company_no = {0}
                   AND  (branch_no IS NULL OR branch_no = {1})
                   AND  doc_type = {2}
-                  AND  is_deleted = 0
                 ORDER BY branch_no NULLS LAST
                 LIMIT 1
                 FOR UPDATE

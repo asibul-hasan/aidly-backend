@@ -33,8 +33,6 @@ public class SysDbContext : ModuleDbContext, ISysDbContext
     public DbSet<SysSubmodule> SysSubmodules => Set<SysSubmodule>();
     public DbSet<SysFile> SysFiles => Set<SysFile>();
     public DbSet<Setting> Settings => Set<Setting>();
-    public DbSet<SysCatalogEntity> SysCatalogEntities => Set<SysCatalogEntity>();
-    public DbSet<ApprovalWorkflow> ApprovalWorkflows => Set<ApprovalWorkflow>();
     public DbSet<ApprovalStep> ApprovalSteps => Set<ApprovalStep>();
     public DbSet<StepApprover> StepApprovers => Set<StepApprover>();
     public DbSet<ApprovalScope> ApprovalScopes => Set<ApprovalScope>();
@@ -49,6 +47,42 @@ public class SysDbContext : ModuleDbContext, ISysDbContext
 
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
+        // ---------------------------------------------------------------------
+        // Audit columns these tables do not actually have.
+        //
+        // Every SYS entity inherits AuditEntity in C#, which maps eleven audit columns. The Java
+        // entities are selective: sys_approval_request and sys_doc_sequence carry none of them,
+        // sys_exchange_rate has no update/delete pair, sys_platform_admin no delete pair. Mapping
+        // them made every query on those tables fail with 42703, so they are ignored here rather
+        // than by weakening the shared base class.
+        // ---------------------------------------------------------------------
+        modelBuilder.Entity<ApprovalRequest>(e =>
+        {
+            e.Ignore(x => x.IsActive); e.Ignore(x => x.IsDeleted);
+            e.Ignore(x => x.CreatedBy); e.Ignore(x => x.CreatedAt);
+            e.Ignore(x => x.UpdatedBy); e.Ignore(x => x.UpdatedAt);
+            e.Ignore(x => x.DeletedBy); e.Ignore(x => x.DeletedAt);
+        });
+
+        modelBuilder.Entity<DocSequence>(e =>
+        {
+            e.Ignore(x => x.IsActive); e.Ignore(x => x.IsDeleted);
+            e.Ignore(x => x.CreatedBy); e.Ignore(x => x.CreatedAt);
+            e.Ignore(x => x.UpdatedBy); e.Ignore(x => x.UpdatedAt);
+            e.Ignore(x => x.DeletedBy); e.Ignore(x => x.DeletedAt);
+        });
+
+        modelBuilder.Entity<ExchangeRate>(e =>
+        {
+            e.Ignore(x => x.UpdatedBy); e.Ignore(x => x.UpdatedAt);
+            e.Ignore(x => x.DeletedBy); e.Ignore(x => x.DeletedAt);
+        });
+
+        modelBuilder.Entity<PlatformAdmin>(e =>
+        {
+            e.Ignore(x => x.DeletedBy); e.Ignore(x => x.DeletedAt);
+        });
+
         modelBuilder.Entity<Company>(entity =>
         {
             entity.HasIndex(e => new { e.CompanyId, e.IsDeleted }).HasDatabaseName("idx_company_id_deleted");

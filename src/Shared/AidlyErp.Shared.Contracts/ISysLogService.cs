@@ -6,15 +6,16 @@ namespace AidlyErp.Shared.Contracts;
 /// </summary>
 public interface ISysLogService
 {
+    /// <summary>
+    /// Mirrors Java <c>writeLog</c> exactly. User agent, request body and error message are
+    /// deliberately absent — <c>sys_log</c> has no such columns.
+    /// </summary>
     Task LogRequestAsync(
         string httpMethod,
         string requestUri,
         int responseStatus,
         long durationMs,
         string? ipAddress,
-        string? userAgent,
-        string? requestBody,
-        string? errorMessage,
         long? companyNo,
         long? branchNo,
         long? userNo,

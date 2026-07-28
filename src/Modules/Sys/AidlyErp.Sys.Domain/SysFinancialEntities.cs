@@ -260,7 +260,7 @@ public class DocSequence : AuditEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("doc_seq_no")]
+    [Column("doc_sequence_no")]
     public long DocSeqNo { get; set; }
 
     [Column("company_no")]
@@ -277,6 +277,6 @@ public class DocSequence : AuditEntity
     [StringLength(20)]
     public string? Prefix { get; set; }
 
-    [Column("next_val")]
+    [Column("next_no")]
     public long NextVal { get; set; } = 1;
 }

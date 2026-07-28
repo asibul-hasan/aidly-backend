@@ -105,7 +105,12 @@ public abstract class ModuleDbContext : DbContext
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             var clr = entityType.ClrType;
-            var isSoftDelete = typeof(ISoftDelete).IsAssignableFrom(clr);
+            // Implementing ISoftDelete is not enough — the predicate reads IsDeleted, so the
+            // property must actually be mapped. A few tables (sys_approval_request,
+            // sys_doc_sequence) inherit AuditEntity in C# but carry no audit columns at all, and
+            // EF cannot translate a filter over an ignored member.
+            var isSoftDelete = typeof(ISoftDelete).IsAssignableFrom(clr)
+                               && entityType.FindProperty(nameof(ISoftDelete.IsDeleted)) != null;
             // Implementing IMultiTenantEntity is not enough — the tenant predicate reads
             // CompanyNo, so the property must actually be mapped to a column. HRM entities
             // implement the interface but are branch-scoped only (no company_no in the schema),

@@ -67,7 +67,8 @@ public class FinVoucher : AuditEntity
     [Column("approval_request_no")]
     public long? ApprovalRequestNo { get; set; }
 
-    [Column("approved_by")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public long? ApprovedBy { get; set; }
 
     [Column("posted_by")]
@@ -100,9 +101,17 @@ public class FinVoucherDtl : AuditEntity
     [Column("account_no")]
     public long AccountNo { get; set; }
 
-    [Column("dr_cr")]
-    [StringLength(2)]
-    public string DrCr { get; set; } = "dr";
+    /// <summary>Derived from which of Debit/Credit carries the value — there is no dr_cr column.</summary>
+    [NotMapped]
+    public string DrCr
+    {
+        get => Credit > 0m && Debit == 0m ? "cr" : "dr";
+        set
+        {
+            if (string.Equals(value, "cr", StringComparison.OrdinalIgnoreCase)) { Credit = Debit > 0m ? Debit : Credit; Debit = 0m; }
+            else { Debit = Credit > 0m ? Credit : Debit; Credit = 0m; }
+        }
+    }
 
     [Column("debit_fc")]
     public decimal DebitFc { get; set; } = 0m;
@@ -150,25 +159,27 @@ public class FinVoucherType : AuditEntity
     [Column("voucher_type_no")]
     public long VoucherTypeNo { get; set; }
 
-    [Column("voucher_type_code")]
+    [Column("voucher_type_id")]
     [StringLength(20)]
     public string VoucherTypeCode { get; set; } = string.Empty;
 
-    [Column("voucher_type_name")]
+    [Column("type_name")]
     [StringLength(100)]
     public string VoucherTypeName { get; set; } = string.Empty;
 
     [Column("base_kind")]
     public short BaseKind { get; set; } = 1;
 
-    [Column("prefix")]
+    [Column("number_prefix")]
     [StringLength(10)]
     public string? Prefix { get; set; }
 
-    [Column("requires_approval")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public short RequiresApproval { get; set; } = 0;
 
-    [Column("is_auto_numbered")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public short IsAutoNumbered { get; set; } = 1;
 
     [Column("company_no")]
@@ -201,12 +212,48 @@ public class FinLedger : AuditEntity
     [Column("voucher_date")]
     public DateTime VoucherDate { get; set; }
 
-    [Column("dr_cr")]
-    [StringLength(2)]
-    public string DrCr { get; set; } = "dr";
+    // fin_ledger stores signed debit/credit columns, exactly as the Java entity does. There is no
+    // dr_cr/amount pair in the schema; the .NET port invented one, which made every ledger read
+    // and write fail. DrCr/Amount are kept as a derived view so posting code is unchanged.
+    [Column("debit")]
+    public decimal Debit { get; set; } = 0m;
 
-    [Column("amount")]
-    public decimal Amount { get; set; } = 0m;
+    [Column("credit")]
+    public decimal Credit { get; set; } = 0m;
+
+    private decimal _amount;
+    private bool _isCredit;
+
+    /// <summary>"dr" or "cr". Reading derives from which column carries the value.</summary>
+    [NotMapped]
+    public string DrCr
+    {
+        get => Credit > 0m && Debit == 0m ? "cr" : "dr";
+        set
+        {
+            _isCredit = string.Equals(value, "cr", StringComparison.OrdinalIgnoreCase);
+            ApplyDirection();
+        }
+    }
+
+    /// <summary>Unsigned magnitude; writes land in Debit or Credit according to <see cref="DrCr"/>.</summary>
+    [NotMapped]
+    public decimal Amount
+    {
+        get => Debit > 0m ? Debit : Credit;
+        set
+        {
+            _amount = value;
+            ApplyDirection();
+        }
+    }
+
+    /// <summary>Re-applies the pair so DrCr and Amount may be assigned in either order.</summary>
+    private void ApplyDirection()
+    {
+        if (_isCredit) { Credit = _amount; Debit = 0m; }
+        else { Debit = _amount; Credit = 0m; }
+    }
 
     [Column("fin_year_no")]
     public long FinYearNo { get; set; }
@@ -248,7 +295,8 @@ public class FinBankAccount : AuditEntity
     [StringLength(20)]
     public string? SwiftCode { get; set; }
 
-    [Column("iban")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     [StringLength(40)]
     public string? Iban { get; set; }
 
@@ -267,7 +315,7 @@ public class FinBankRecon : AuditEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("recon_no")]
+    [Column("bank_recon_no")]
     public long ReconNo { get; set; }
 
     [Column("account_no")]
@@ -282,13 +330,15 @@ public class FinBankRecon : AuditEntity
     [Column("book_balance")]
     public decimal BookBalance { get; set; }
 
-    [Column("cleared_debits")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public decimal ClearedDebits { get; set; }
 
-    [Column("cleared_credits")]
+    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
+    [NotMapped]
     public decimal ClearedCredits { get; set; }
 
-    [Column("reconciled_balance")]
+    [Column("cleared_balance")]
     public decimal ReconciledBalance { get; set; }
 
     [Column("difference")]
@@ -297,7 +347,8 @@ public class FinBankRecon : AuditEntity
     [Column("status")]
     public short Status { get; set; } = 1; // 1=Draft 2=Completed
 
-    [Column("remarks")]
+    /// <summary>Java calls this column <c>narration</c>; there is no <c>remarks</c> on this table.</summary>
+    [Column("narration")]
     [StringLength(250)]
     public string? Remarks { get; set; }
 
@@ -313,21 +364,27 @@ public class FinBankReconLine : AuditEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("recon_line_no")]
+    [Column("bank_recon_line_no")]
     public long ReconLineNo { get; set; }
 
-    [Column("recon_no")]
+    [Column("bank_recon_no")]
     public long ReconNo { get; set; }
 
     [Column("ledger_no")]
     public long LedgerNo { get; set; }
 
-    [Column("voucher_dtl_no")]
+    /// <summary>Not a column — the line points at the ledger entry, not a voucher line.</summary>
+    [NotMapped]
     public long VoucherDtlNo { get; set; }
 
-    [Column("cleared_date")]
+    [Column("bank_date")]
     public DateTime? ClearedDate { get; set; }
 
-    [Column("is_cleared")]
-    public short IsCleared { get; set; } = 0;
+    /// <summary>Derived: a line is cleared once the bank date is set. There is no is_cleared column.</summary>
+    [NotMapped]
+    public short IsCleared
+    {
+        get => (short)(ClearedDate != null ? 1 : 0);
+        set => ClearedDate = value == 1 ? ClearedDate ?? DateTime.UtcNow : null;
+    }
 }

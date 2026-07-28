@@ -91,15 +91,9 @@ public class SysLog
     [StringLength(45)]
     public string? IpAddress { get; set; }
 
-    [Column("user_agent")]
-    [StringLength(500)]
-    public string? UserAgent { get; set; }
-
-    [Column("request_body")]
-    public string? RequestBody { get; set; }
-
-    [Column("error_message")]
-    public string? ErrorMessage { get; set; }
+    // No user_agent / request_body / error_message here: sys_log has none of those columns and
+    // the Java entity never declared them. Mapping them made every request-log insert fail with
+    // 42703 — invisibly, because the writer swallows its exceptions.
 
     [Column("request_at")]
     public DateTime RequestAt { get; set; } = DateTime.UtcNow;

@@ -275,15 +275,3 @@ public class Setting : AuditEntity
     public string? Description { get; set; }
 }
 
-[Table("sys_catalog_entity")]
-public class SysCatalogEntity : AuditEntity
-{
-    [Key]
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("catalog_no")]
-    public long CatalogNo { get; set; }
-
-    [Column("entity_name")]
-    [StringLength(100)]
-    public string EntityName { get; set; } = string.Empty;
-}

@@ -4,26 +4,6 @@ using AidlyErp.Shared.Core;
 
 namespace AidlyErp.Sys.Domain;
 
-[Table("sys_approval_workflow")]
-public class ApprovalWorkflow : AuditEntity
-{
-    [Key]
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("workflow_no")]
-    public long WorkflowNo { get; set; }
-
-    [Column("company_no")]
-    public long CompanyNo { get; set; }
-
-    [Column("workflow_name")]
-    [StringLength(100)]
-    public string WorkflowName { get; set; } = string.Empty;
-
-    [Column("doc_type")]
-    [StringLength(50)]
-    public string DocType { get; set; } = string.Empty;
-}
-
 [Table("sys_approval_step")]
 public class ApprovalStep : AuditEntity
 {
@@ -238,10 +218,10 @@ public class PlatformAdmin : AuditEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("admin_no")]
+    [Column("platform_admin_no")]
     public long AdminNo { get; set; }
 
-    [Column("username")]
+    [Column("admin_login")]
     [StringLength(100)]
     public string Username { get; set; } = string.Empty;
 
@@ -305,7 +285,7 @@ public class UserWarehouse : AuditEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("user_wh_no")]
+    [Column("user_warehouse_no")]
     public long UserWhNo { get; set; }
 
     [Column("user_no")]

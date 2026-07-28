@@ -30,8 +30,6 @@ public interface ISysDbContext
     DbSet<SysSubmodule> SysSubmodules { get; }
     DbSet<SysFile> SysFiles { get; }
     DbSet<Setting> Settings { get; }
-    DbSet<SysCatalogEntity> SysCatalogEntities { get; }
-    DbSet<ApprovalWorkflow> ApprovalWorkflows { get; }
     DbSet<ApprovalStep> ApprovalSteps { get; }
     DbSet<StepApprover> StepApprovers { get; }
     DbSet<ApprovalScope> ApprovalScopes { get; }

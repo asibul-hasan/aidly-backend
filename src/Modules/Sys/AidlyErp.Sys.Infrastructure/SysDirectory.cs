@@ -97,8 +97,6 @@ internal sealed class DocSequenceGenerator : IDocSequenceGenerator
                 DocType = docType,
                 Prefix = prefix,
                 NextVal = 2,
-                IsDeleted = 0,
-                CreatedAt = DateTime.UtcNow
             });
 
             await _db.SaveChangesAsync(cancellationToken);

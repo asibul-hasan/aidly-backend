@@ -67,7 +67,7 @@ public class FinAccountGroup : AuditEntity
     [Column("account_group_no")]
     public long AccountGroupNo { get; set; }
 
-    [Column("group_code")]
+    [Column("account_group_id")]
     [StringLength(30)]
     public string GroupCode { get; set; } = string.Empty;
 
@@ -85,7 +85,7 @@ public class FinAccountGroup : AuditEntity
     [StringLength(2)]
     public string? NormalBalance { get; set; }
 
-    [Column("display_order")]
+    [Column("order_sl")]
     public int DisplayOrder { get; set; } = 0;
 
     [Column("company_no")]
@@ -109,14 +109,27 @@ public class FinAccountBalance : AuditEntity
     [Column("fin_period_no")]
     public long FinPeriodNo { get; set; }
 
-    [Column("debit_amount")]
+    // The schema splits balances into opening and period pairs, as the Java entity does. The port
+    // collapsed them into debit_amount/credit_amount/closing_balance, none of which exist.
+    [Column("opening_debit")]
+    public decimal OpeningDebit { get; set; } = 0m;
+
+    [Column("opening_credit")]
+    public decimal OpeningCredit { get; set; } = 0m;
+
+    [Column("period_debit")]
     public decimal DebitAmount { get; set; } = 0m;
 
-    [Column("credit_amount")]
+    [Column("period_credit")]
     public decimal CreditAmount { get; set; } = 0m;
 
-    [Column("closing_balance")]
-    public decimal ClosingBalance { get; set; } = 0m;
+    /// <summary>Derived: opening plus period movement. Not stored.</summary>
+    [NotMapped]
+    public decimal ClosingBalance
+    {
+        get => OpeningDebit - OpeningCredit + DebitAmount - CreditAmount;
+        set { }
+    }
 
     [Column("branch_no")]
     public long BranchNo { get; set; }

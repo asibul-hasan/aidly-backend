@@ -24,9 +24,6 @@ public class SysLogService : ISysLogService
         int responseStatus,
         long durationMs,
         string? ipAddress,
-        string? userAgent,
-        string? requestBody,
-        string? errorMessage,
         long? companyNo,
         long? branchNo,
         long? userNo,
@@ -48,9 +45,6 @@ public class SysLogService : ISysLogService
                 ResponseStatus = responseStatus,
                 DurationMs = durationMs,
                 IpAddress = ipAddress,
-                UserAgent = userAgent,
-                RequestBody = requestBody,
-                ErrorMessage = errorMessage,
                 RequestAt = DateTime.UtcNow
             };
             db.SysLogs.Add(log);
