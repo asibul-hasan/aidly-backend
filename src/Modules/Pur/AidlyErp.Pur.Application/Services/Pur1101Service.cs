@@ -1,3 +1,4 @@
+using AidlyErp.Inv.Contracts;
 using AidlyErp.Pur.Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using AidlyErp.Shared.Core.Exceptions;
@@ -30,15 +31,18 @@ public class Pur1101Service : IPur1101Service
 {
     private readonly IPurDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly IInvCatalog _catalog;
     private readonly IApprovalService _approvalService;
     public const string DocType = "PUR_PO";
     private const short StDraft = 1, StSubmitted = 2, StApproved = 3, StCancelled = 7;
 
-    public Pur1101Service(IPurDbContext db, ICompanyBranchContext ctx, IApprovalService approvalService)
+    public Pur1101Service(IPurDbContext db, ICompanyBranchContext ctx, IApprovalService approvalService,
+                          IInvCatalog catalog)
     {
         _db = db;
         _ctx = ctx;
         _approvalService = approvalService;
+        _catalog = catalog;
     }
 
     public async Task<List<Pur1101OrderDto>> GetListAsync(CancellationToken ct = default)
@@ -57,9 +61,7 @@ public class Pur1101Service : IPur1101Service
             .ToDictionaryAsync(s => s.SupplierNo, s => s.SupplierName, ct);
 
         var warehouseNos = orders.Select(o => o.WarehouseNo).Distinct().ToList();
-        var warehouses = await _db.InvWarehouses.AsNoTracking()
-            .Where(w => warehouseNos.Contains(w.WarehouseNo) && w.IsDeleted == 0)
-            .ToDictionaryAsync(w => w.WarehouseNo, w => w.WarehouseName, ct);
+        var warehouses = await _catalog.GetWarehouseNamesAsync(warehouseNos, ct);
 
         return orders.Select(o => ToHeaderDto(o, suppliers, warehouses)).ToList();
     }
@@ -77,9 +79,7 @@ public class Pur1101Service : IPur1101Service
             .ToListAsync(ct);
 
         var productNos = lines.Select(l => l.ItemNo).Distinct().ToList();
-        var products = await _db.InvProducts.AsNoTracking()
-            .Where(p => productNos.Contains(p.ProductNo) && p.IsDeleted == 0)
-            .ToDictionaryAsync(p => p.ProductNo, p => p.ProductName, ct);
+        var products = await _catalog.GetProductNamesAsync(productNos, ct);
 
         dto.Lines = lines.Select(l => new Pur1101LineDto
         {
@@ -232,8 +232,7 @@ public class Pur1101Service : IPur1101Service
         {
             if (r.ItemNo <= 0 || r.Quantity <= 0) continue;
 
-            var product = await _db.InvProducts.AsNoTracking()
-                .FirstOrDefaultAsync(p => p.ProductNo == r.ItemNo && p.IsDeleted == 0, ct)
+            var product = await _catalog.FindProductAsync(r.ItemNo, cancellationToken: ct)
                 ?? throw new NotFoundException($"Product not found: {r.ItemNo}");
 
             decimal lineTotal = r.Quantity * r.UnitPrice;
@@ -285,8 +284,7 @@ public class Pur1101Service : IPur1101Service
 
     private async Task RequireWarehouseAsync(long warehouseNo, long branchNo, CancellationToken ct)
     {
-        var warehouse = await _db.InvWarehouses.AsNoTracking()
-            .FirstOrDefaultAsync(w => w.WarehouseNo == warehouseNo && w.IsDeleted == 0, ct)
+        var warehouse = await _catalog.FindWarehouseAsync(warehouseNo, ct)
             ?? throw new NotFoundException("Warehouse not found");
         if (warehouse.BranchNo != branchNo) throw new ValidationException("Warehouse does not belong to your branch");
     }
@@ -303,12 +301,11 @@ public class Pur1101Service : IPur1101Service
     {
         var companyNo = _ctx.CurrentCompanyNo() ?? 0;
         var branchNo = _ctx.CurrentBranchNo() ?? 0;
-        return await _db.InvWarehouses.AsNoTracking()
-            .Where(w => w.CompanyNo == companyNo && w.BranchNo == branchNo && w.IsDeleted == 0)
-            .ToDictionaryAsync(w => w.WarehouseNo, w => w.WarehouseName, ct);
+        var warehouses = await _catalog.ListWarehousesAsync(companyNo, branchNo, ct);
+        return warehouses.ToDictionary(w => w.WarehouseNo, w => w.WarehouseName ?? string.Empty);
     }
 
-    private static Pur1101OrderDto ToHeaderDto(PurOrder o, Dictionary<long, string> sup, Dictionary<long, string> wh) => new()
+    private static Pur1101OrderDto ToHeaderDto(PurOrder o, IReadOnlyDictionary<long, string> sup, IReadOnlyDictionary<long, string> wh) => new()
     {
         OrderNo = o.OrderNo,
         OrderId = o.OrderId,

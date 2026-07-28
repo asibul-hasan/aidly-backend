@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\..\Shared\AidlyErp.Shared.Core\AidlyErp.Shared.Core.csproj" />
     <ProjectReference Include="..\..\..\Shared\AidlyErp.Shared.Contracts\AidlyErp.Shared.Contracts.csproj" />
     <ProjectReference Include="..\..\Hrm\AidlyErp.Hrm.Contracts\AidlyErp.Hrm.Contracts.csproj" />
+    <ProjectReference Include="..\..\Inv\AidlyErp.Inv.Contracts\AidlyErp.Inv.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

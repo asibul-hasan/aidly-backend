@@ -38,6 +38,7 @@ public interface IAuthService
 public class AuthService : IAuthService
 {
     private readonly ISysDbContext _db;
+    private readonly IEmployeeDirectory _employees;
     private readonly ICompanyBranchContext _tenantContext;
     private readonly IJwtTokenService _jwtService;
     private readonly IRbacAuthorizationService _rbacService;
@@ -54,9 +55,11 @@ public class AuthService : IAuthService
         ISysSessionService sessionService,
         ILoginAttemptService loginAttemptService,
         LoginAttemptLimiter loginAttemptLimiter,
+        IEmployeeDirectory employees,
         IAuthConfigService? authConfigService = null)
     {
         _db = db;
+        _employees = employees;
         _tenantContext = tenantContext;
         _jwtService = jwtService;
         _rbacService = rbacService;
@@ -159,23 +162,12 @@ public class AuthService : IAuthService
             permBits: rbac.PermBits);
 
         // Employee-derived display fields, resolved by indexed lookup.
-        var emp = user.EmployeeNo <= 0
-            ? null
-            : await _db.HrmEmployees.AsNoTracking()
-                .FirstOrDefaultAsync(e => e.EmployeeNo == user.EmployeeNo && e.IsDeleted == 0);
+        // Employee display fields come from HRM through its contract, which already resolves
+        // department and designation names.
+        var emp = user.EmployeeNo <= 0 ? null : await _employees.FindAsync(user.EmployeeNo);
 
-        string? departmentName = null, designationName = null;
-
-        if (emp != null)
-        {
-            departmentName = await _db.HrmDepartments.AsNoTracking()
-                .Where(d => d.DepartmentNo == emp.DepartmentNo && d.IsDeleted == 0)
-                .Select(d => d.DepartmentName).FirstOrDefaultAsync();
-
-            designationName = await _db.HrmDesignations.AsNoTracking()
-                .Where(d => d.DesignationNo == emp.DesignationNo && d.IsDeleted == 0)
-                .Select(d => d.DesignationName).FirstOrDefaultAsync();
-        }
+        string? departmentName = emp?.DepartmentName;
+        string? designationName = emp?.DesignationName;
 
         return new LoginResponse
         {
@@ -253,15 +245,12 @@ public class AuthService : IAuthService
         string? employeeName = null, designation = null, companyName = null, branchName = null;
         if (user.EmployeeNo > 0)
         {
-            var emp = await _db.HrmEmployees.AsNoTracking()
-                .FirstOrDefaultAsync(e => e.EmployeeNo == user.EmployeeNo && e.IsDeleted == 0);
+            var emp = await _employees.FindAsync(user.EmployeeNo);
             if (emp != null)
             {
+                // Java joins first + last only here — no middle name.
                 employeeName = $"{emp.FirstName}{(string.IsNullOrWhiteSpace(emp.LastName) ? "" : " " + emp.LastName)}";
-                if (emp.DesignationNo > 0)
-                    designation = await _db.HrmDesignations.AsNoTracking()
-                        .Where(d => d.DesignationNo == emp.DesignationNo && d.IsDeleted == 0)
-                        .Select(d => d.DesignationName).FirstOrDefaultAsync();
+                if (emp.DesignationNo > 0) designation = emp.DesignationName;
             }
         }
 

@@ -58,14 +58,14 @@ internal sealed class EmployeeDirectory : IEmployeeDirectory
         if (emp == null) return null;
 
         // Direct indexed PK lookups — never scan the employee table just to read two names.
-        var deptName = emp.DepartmentNo == null
+        var deptName = emp.DepartmentNo <= 0
             ? null
             : await _db.HrmDepartments.AsNoTracking()
                 .Where(d => d.DepartmentNo == emp.DepartmentNo && d.IsDeleted == Deleted)
                 .Select(d => d.DepartmentName)
                 .FirstOrDefaultAsync(cancellationToken);
 
-        var desigName = emp.DesignationNo == null
+        var desigName = emp.DesignationNo <= 0
             ? null
             : await _db.HrmDesignations.AsNoTracking()
                 .Where(g => g.DesignationNo == emp.DesignationNo && g.IsDeleted == Deleted)

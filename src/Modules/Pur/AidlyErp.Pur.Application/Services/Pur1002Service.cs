@@ -1,3 +1,4 @@
+using AidlyErp.Inv.Contracts;
 using AidlyErp.Pur.Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using AidlyErp.Shared.Core.Exceptions;
@@ -25,11 +26,13 @@ public class Pur1002Service : IPur1002Service
 {
     private readonly IPurDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly IInvCatalog _catalog;
 
-    public Pur1002Service(IPurDbContext db, ICompanyBranchContext ctx)
+    public Pur1002Service(IPurDbContext db, ICompanyBranchContext ctx, IInvCatalog catalog)
     {
         _db = db;
         _ctx = ctx;
+        _catalog = catalog;
     }
 
     public async Task<List<Pur1002PriceRowDto>> GetRowsAsync(long supplierNo, CancellationToken ct = default)
@@ -71,8 +74,7 @@ public class Pur1002Service : IPur1002Service
             if (dto.ProductNo <= 0) continue;
 
             // Validate product exists.
-            var product = await _db.InvProducts.AsNoTracking()
-                .FirstOrDefaultAsync(p => p.ProductNo == dto.ProductNo && p.CompanyNo == companyNo && p.IsDeleted == 0, ct)
+            var product = await _catalog.FindProductAsync(dto.ProductNo, companyNo, ct)
                 ?? throw new NotFoundException($"Product not found: {dto.ProductNo}");
 
             PurSupplierProduct row;

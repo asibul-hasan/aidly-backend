@@ -1,3 +1,4 @@
+using AidlyErp.Sys.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using AidlyErp.Shared.Infrastructure.Persistence;
 
@@ -18,7 +19,7 @@ public class DbFixer : IHostedService
     {
         _logger.LogInformation("Running DbFixer to clean up null row_versions and patch schema...");
         using var scope = _serviceProvider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SysDbContext>();
 
         try
         {

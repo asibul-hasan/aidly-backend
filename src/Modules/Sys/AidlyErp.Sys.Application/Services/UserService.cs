@@ -39,14 +39,17 @@ public class UserService : IUserService
     private readonly ISysDbContext _db;
     private readonly IUnitOfWork<ISysDbContext> _unitOfWork;
     private readonly ICompanyBranchContext _ctx;
+    private readonly IEmployeeDirectory _employees;
     private readonly ILogger<UserService> _logger;
 
     public UserService(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
+                       IEmployeeDirectory employees,
                        ILogger<UserService> logger)
     {
         _db = db;
         _unitOfWork = unitOfWork;
         _ctx = ctx;
+        _employees = employees;
         _logger = logger;
     }
 
@@ -263,11 +266,9 @@ public class UserService : IUserService
 
         dto.RoleMappings = await ToRoleDtosAsync(mappings, ct);
 
-        if (user.EmployeeNo == null) return dto;
+        if (user.EmployeeNo <= 0) return dto;
 
-        var emp = await _db.HrmEmployees
-            .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.EmployeeNo == user.EmployeeNo && e.IsDeleted == Deleted, ct);
+        var emp = await _employees.FindAsync(user.EmployeeNo, ct);
 
         if (emp == null) return dto;
 
@@ -285,15 +286,8 @@ public class UserService : IUserService
         dto.MobileNumber = emp.MobileNumber;
         dto.JoiningDate = DateOnly.FromDateTime(emp.JoiningDate);
 
-        dto.DepartmentName = await _db.HrmDepartments.AsNoTracking()
-            .Where(d => d.DepartmentNo == emp.DepartmentNo && d.IsDeleted == Deleted)
-            .Select(d => d.DepartmentName)
-            .FirstOrDefaultAsync(ct);
-
-        dto.DesignationName = await _db.HrmDesignations.AsNoTracking()
-            .Where(d => d.DesignationNo == emp.DesignationNo && d.IsDeleted == Deleted)
-            .Select(d => d.DesignationName)
-            .FirstOrDefaultAsync(ct);
+        dto.DepartmentName = emp.DepartmentName;
+        dto.DesignationName = emp.DesignationName;
 
         return dto;
     }

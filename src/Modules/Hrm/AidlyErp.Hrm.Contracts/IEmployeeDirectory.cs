@@ -23,13 +23,22 @@ public sealed record EmployeeInfo
     public string? OfficialEmail { get; init; }
     public string? MobileNumber { get; init; }
 
-    /// <summary>Name parts joined, falling back to the employee id when all of them are blank.</summary>
+    /// <summary>
+    /// First + middle + last, single-spaced. Empty when no name part is set — this mirrors
+    /// <c>HrmEmployee.EmployeeName</c> exactly, so callers that surface it keep their current output.
+    /// </summary>
+    public string EmployeeName =>
+        string.Join(' ', new[] { FirstName, MiddleName, LastName }.Where(p => !string.IsNullOrWhiteSpace(p)));
+
+    /// <summary>
+    /// Like <see cref="EmployeeName"/> but falling back to the employee id when every name part is
+    /// blank. Use this where a label must never be empty.
+    /// </summary>
     public string FullName
     {
         get
         {
-            var name = string.Join(' ',
-                new[] { FirstName, MiddleName, LastName }.Where(p => !string.IsNullOrWhiteSpace(p))).Trim();
+            var name = EmployeeName.Trim();
             return string.IsNullOrWhiteSpace(name) ? EmployeeId : name;
         }
     }

@@ -1,3 +1,4 @@
+using AidlyErp.Inv.Contracts;
 using AidlyErp.Pur.Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using AidlyErp.Shared.Core.Exceptions;
@@ -27,12 +28,14 @@ public class Pur1103Service : IPur1103Service
 {
     private readonly IPurDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly IInvCatalog _catalog;
     private const short StDraft = 1, StPosted = 2;
 
-    public Pur1103Service(IPurDbContext db, ICompanyBranchContext ctx)
+    public Pur1103Service(IPurDbContext db, ICompanyBranchContext ctx, IInvCatalog catalog)
     {
         _db = db;
         _ctx = ctx;
+        _catalog = catalog;
     }
 
     public async Task<List<Pur1103ReturnDto>> GetListAsync(CancellationToken ct = default)
@@ -77,9 +80,7 @@ public class Pur1103Service : IPur1103Service
             .ToListAsync(ct);
 
         var productNos = lines.Select(l => l.ItemNo).Distinct().ToList();
-        var products = await _db.InvProducts.AsNoTracking()
-            .Where(p => productNos.Contains(p.ProductNo) && p.IsDeleted == 0)
-            .ToDictionaryAsync(p => p.ProductNo, p => p.ProductName, ct);
+        var products = await _catalog.GetProductNamesAsync(productNos, ct);
 
         return new Pur1103ReturnDto
         {

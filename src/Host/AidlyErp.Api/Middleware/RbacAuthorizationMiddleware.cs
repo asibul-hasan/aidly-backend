@@ -43,7 +43,7 @@ public class RbacAuthorizationMiddleware
 
     public async Task InvokeAsync(HttpContext context,
                                   IRbacAuthorizationService rbac,
-                                  IApplicationDbContext db,
+                                  ISysDbContext db,
                                   ICompanyBranchContext tenant,
                                   ICurrentPermissionContext permissionContext)
     {
@@ -112,7 +112,7 @@ public class RbacAuthorizationMiddleware
         await _next(context);
     }
 
-    private static async Task<string?> ResolveFormIdAsync(HttpRequest request, IApplicationDbContext db,
+    private static async Task<string?> ResolveFormIdAsync(HttpRequest request, ISysDbContext db,
                                                           CancellationToken cancellationToken)
     {
         var requestPath = NormalizePath(request.Path.Value);
@@ -139,7 +139,7 @@ public class RbacAuthorizationMiddleware
     /// <c>/9</c> share one cache key.
     /// </summary>
     private static async Task<string?> CachedFormIdForPathAsync(string requestPath, string withoutApiPrefix,
-                                                                IApplicationDbContext db,
+                                                                ISysDbContext db,
                                                                 CancellationToken cancellationToken)
     {
         var key = NumericSegment.Replace(requestPath, "/{id}");
@@ -163,7 +163,7 @@ public class RbacAuthorizationMiddleware
     /// <c>route_path</c>. Ported verbatim from <c>MenuRepository.findBestFormIdForRequestPath</c>.
     /// </summary>
     private static async Task<string?> FindBestFormIdForRequestPathAsync(string requestPath, string withoutApiPrefix,
-                                                                         IApplicationDbContext db,
+                                                                         ISysDbContext db,
                                                                          CancellationToken cancellationToken)
     {
         var rows = await db.Database.SqlQueryRaw<string?>(

@@ -1,3 +1,4 @@
+using AidlyErp.Shared.Core.Audit;
 using AidlyErp.Sys.Application.Interfaces;
 using AidlyErp.Sys.Domain;
 using AidlyErp.Shared.Core.Security;

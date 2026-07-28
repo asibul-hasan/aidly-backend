@@ -6,7 +6,6 @@ using AidlyErp.Sys.Application.Interfaces;
 using AidlyErp.Hrm.Contracts;
 using AidlyErp.Shared.Core.Audit;
 using AidlyErp.Sys.Domain;
-using AidlyErp.Sys.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace AidlyErp.Shared.Infrastructure.Persistence.Repositories;

@@ -5,23 +5,40 @@ using AidlyErp.Shared.Contracts;
 using AidlyErp.Sys.Contracts;
 using AidlyErp.Sys.Application.Interfaces;
 using AidlyErp.Hrm.Application.Interfaces;
+using AidlyErp.Sal.Application.Interfaces;
+using AidlyErp.Pur.Application.Interfaces;
+using AidlyErp.Fin.Application.Interfaces;
+using AidlyErp.Inv.Application.Interfaces;
 
 namespace AidlyErp.Api.Controllers;
 
 [Route("api/v1/common/lookups")]
 public class CommonLookupController : ApiControllerBase
 {
-    private readonly IApplicationDbContext _db;
+    // The Host is the composition root, so it may see every module. Each query still goes through
+    // the owning module's context — there is no omniscient DbContext any more.
+    private readonly ISysDbContext _sys;
+    private readonly IHrmDbContext _hrm;
+    private readonly IInvDbContext _inv;
+    private readonly IFinDbContext _fin;
+    private readonly IPurDbContext _pur;
+    private readonly ISalDbContext _sal;
 
-    public CommonLookupController(IApplicationDbContext db)
+    public CommonLookupController(ISysDbContext sys, IHrmDbContext hrm, IInvDbContext inv,
+                                  IFinDbContext fin, IPurDbContext pur, ISalDbContext sal)
     {
-        _db = db;
+        _sys = sys;
+        _hrm = hrm;
+        _inv = inv;
+        _fin = fin;
+        _pur = pur;
+        _sal = sal;
     }
 
     [HttpGet("employees")]
     public async Task<IActionResult> GetEmployees()
     {
-        var data = await _db.HrmEmployees
+        var data = await _hrm.HrmEmployees
             .AsNoTracking()
             .Select(x => new { id = x.EmployeeNo, code = x.EmployeeId, name = x.FirstName + " " + x.LastName, departmentNo = x.DepartmentNo, designationNo = x.DesignationNo })
             .ToListAsync();
@@ -31,7 +48,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("departments")]
     public async Task<IActionResult> GetDepartments()
     {
-        var data = await _db.HrmDepartments
+        var data = await _hrm.HrmDepartments
             .AsNoTracking()
             .Select(x => new { id = x.DepartmentNo, code = x.DepartmentId, name = x.DepartmentName })
             .ToListAsync();
@@ -41,7 +58,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("designations")]
     public async Task<IActionResult> GetDesignations([FromQuery] long? departmentNo)
     {
-        var query = _db.HrmDesignations.AsNoTracking();
+        var query = _hrm.HrmDesignations.AsNoTracking();
         if (departmentNo.HasValue)
         {
             query = query.Where(x => x.DepartmentNo == departmentNo.Value);
@@ -53,7 +70,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("grades")]
     public async Task<IActionResult> GetGrades()
     {
-        var data = await _db.HrmGrades
+        var data = await _hrm.HrmGrades
             .AsNoTracking()
             .Select(x => new { id = x.GradeNo, code = x.GradeNo.ToString(), name = x.GradeName })
             .ToListAsync();
@@ -63,7 +80,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("grades/{gradeNo}/steps")]
     public async Task<IActionResult> GetGradeSteps(long gradeNo)
     {
-        var data = await _db.HrmGradeSteps
+        var data = await _hrm.HrmGradeSteps
             .AsNoTracking()
             .Where(x => x.GradeNo == gradeNo)
             .Select(x => new { id = x.GradeStepNo, name = x.StepName, amount = x.BasicSalary })
@@ -74,7 +91,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("branches")]
     public async Task<IActionResult> GetBranches()
     {
-        var data = await _db.Branches
+        var data = await _sys.Branches
             .AsNoTracking()
             .Select(x => new { id = x.BranchNo, code = x.BranchId, name = x.BranchName })
             .ToListAsync();
@@ -84,7 +101,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("currencies")]
     public async Task<IActionResult> GetCurrencies()
     {
-        var data = await _db.Currencies
+        var data = await _sys.Currencies
             .AsNoTracking()
             .Select(x => new { id = x.CurrencyNo, code = x.CurrencyCode, name = x.CurrencyName, symbol = x.CurrencySymbol })
             .ToListAsync();
@@ -94,7 +111,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("warehouses")]
     public async Task<IActionResult> GetWarehouses()
     {
-        var data = await _db.InvWarehouses
+        var data = await _inv.InvWarehouses
             .AsNoTracking()
             .Select(x => new { id = x.WarehouseNo, code = x.WarehouseCode, name = x.WarehouseName })
             .ToListAsync();
@@ -104,7 +121,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("products")]
     public async Task<IActionResult> GetProducts()
     {
-        var data = await _db.InvProducts
+        var data = await _inv.InvProducts
             .AsNoTracking()
             .Select(x => new { id = x.ProductNo, code = x.ProductCode, name = x.ProductName })
             .ToListAsync();
@@ -114,7 +131,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("uoms")]
     public async Task<IActionResult> GetUoms()
     {
-        var data = await _db.InvUoms
+        var data = await _inv.InvUoms
             .AsNoTracking()
             .Select(x => new { id = x.UomNo, code = x.UomCode, name = x.UomName })
             .ToListAsync();
@@ -124,7 +141,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("accounts")]
     public async Task<IActionResult> GetAccounts()
     {
-        var data = await _db.FinAccounts
+        var data = await _fin.FinAccounts
             .AsNoTracking()
             .Select(x => new { id = x.AccountNo, code = x.AccountCode, name = x.AccountName })
             .ToListAsync();
@@ -134,7 +151,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("suppliers")]
     public async Task<IActionResult> GetSuppliers()
     {
-        var data = await _db.PurSuppliers
+        var data = await _pur.PurSuppliers
             .AsNoTracking()
             .Select(x => new { id = x.SupplierNo, code = x.SupplierCode, name = x.SupplierName })
             .ToListAsync();
@@ -144,7 +161,7 @@ public class CommonLookupController : ApiControllerBase
     [HttpGet("customers")]
     public async Task<IActionResult> GetCustomers()
     {
-        var data = await _db.SalCustomers
+        var data = await _sal.SalCustomers
             .AsNoTracking()
             .Select(x => new { id = x.CustomerNo, code = x.CustomerCode, name = x.CustomerName })
             .ToListAsync();

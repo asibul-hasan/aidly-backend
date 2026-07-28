@@ -1,3 +1,9 @@
+using AidlyErp.Sal.Infrastructure;
+using AidlyErp.Pur.Infrastructure;
+using AidlyErp.Inv.Infrastructure;
+using AidlyErp.Fin.Infrastructure;
+using AidlyErp.Hrm.Infrastructure;
+using AidlyErp.Sys.Infrastructure;
 using System.Text;
 using System.Text.Json;
 using AidlyErp.Api.Middleware;
@@ -54,7 +60,6 @@ builder.Services.AddScoped<ICurrentPermissionContext, CurrentPermissionContext>(
 builder.Services.AddScoped<AuditingAndTenantInterceptor>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<ISysLogService, SysLogService>();
 builder.Services.AddScoped<AidlyErp.Api.Bootstrap.IAppBootstrapService, AidlyErp.Api.Bootstrap.AppBootstrapService>();
 
@@ -68,7 +73,6 @@ builder.Services.AddScoped<AidlyErp.Shared.Core.Abstractions.IFileStorage, Aidly
 // Auth support services (ports of the Java core.auth.service package)
 builder.Services.AddSingleton<LoginAttemptLimiter>();          // sliding window must outlive the request
 builder.Services.AddSingleton<IAuthConfigService, AuthConfigService>();
-builder.Services.AddSingleton<IApplicationDbContextFactory, ApplicationDbContextFactory>();
 builder.Services.AddScoped<ILoginAttemptService, LoginAttemptService>();
 builder.Services.AddScoped<IAuthRuntimeValidationService, AuthRuntimeValidationService>();
 builder.Services.AddScoped<ISysSessionService, SysSessionService>();
@@ -205,7 +209,7 @@ builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISal1103Service, Ai
 builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISalApprovalListener, AidlyErp.Sal.Application.Services.SalApprovalListener>();
 
 // INV Module Services
-builder.Services.AddScoped<AidlyErp.Inv.Application.Engine.IInvStockPostingService, AidlyErp.Inv.Application.Engine.InvStockPostingService>();
+builder.Services.AddScoped<AidlyErp.Inv.Contracts.IInvStockPostingService, AidlyErp.Inv.Application.Engine.InvStockPostingService>();
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInvDocSequenceService, AidlyErp.Inv.Application.Services.InvDocSequenceService>();
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInvPeriodResolver, AidlyErp.Inv.Application.Services.InvPeriodResolver>();
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInv1001Service, AidlyErp.Inv.Application.Services.Inv1001Service>();
@@ -238,14 +242,18 @@ builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPur1106Service, Ai
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Host=localhost;Database=aidly_sme;Username=postgres;Password=postgres";
 
-builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
-{
-    var interceptor = sp.GetRequiredService<AuditingAndTenantInterceptor>();
-    options.UseNpgsql(connectionString)
-           .AddInterceptors(interceptor);
-});
-
-builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+// ---------------------------------------------------------------------------
+// Module persistence. Every module owns its own DbContext over the same physical
+// database, so a module can only reach the tables it declares. They share the
+// connection string and the auditing/tenant interceptor.
+// ---------------------------------------------------------------------------
+builder.Services
+    .AddSysModule(connectionString)
+    .AddHrmModule(connectionString)
+    .AddFinModule(connectionString)
+    .AddInvModule(connectionString)
+    .AddPurModule(connectionString)
+    .AddSalModule(connectionString);
 
 // ---------------------------------------------------------------------------
 // Authentication — JWT bearer.
