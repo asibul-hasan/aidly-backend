@@ -54,8 +54,8 @@ public class FinReportService : IFinReportService
             .Select(g => new
             {
                 AccountNo = g.Key,
-                TotalDebit = g.Sum(x => x.DrCr == "dr" ? x.Amount : 0m),
-                TotalCredit = g.Sum(x => x.DrCr == "cr" ? x.Amount : 0m)
+                TotalDebit = g.Sum(x => x.Debit),
+                TotalCredit = g.Sum(x => x.Credit)
             })
             .ToDictionaryAsync(x => x.AccountNo, ct);
 
@@ -98,8 +98,8 @@ public class FinReportService : IFinReportService
             .Where(l => l.AccountNo == accountNo && l.VoucherDate < fromDate && l.IsDeleted == 0)
             .ToListAsync(ct);
 
-        decimal priorDeb = priorLedgers.Where(l => l.DrCr == "dr").Sum(l => l.Amount);
-        decimal priorCred = priorLedgers.Where(l => l.DrCr == "cr").Sum(l => l.Amount);
+        decimal priorDeb = priorLedgers.Sum(l => l.Debit);
+        decimal priorCred = priorLedgers.Sum(l => l.Credit);
 
         decimal openBal = acc.NormalBalance == "dr"
             ? (acc.OpeningBalance + priorDeb - priorCred)
@@ -118,8 +118,8 @@ public class FinReportService : IFinReportService
 
         foreach (var l in periodLedgers)
         {
-            decimal deb = l.DrCr == "dr" ? l.Amount : 0m;
-            decimal cred = l.DrCr == "cr" ? l.Amount : 0m;
+            decimal deb = l.Debit;
+            decimal cred = l.Credit;
 
             if (acc.NormalBalance == "dr") running += (deb - cred);
             else running += (cred - deb);
@@ -143,8 +143,8 @@ public class FinReportService : IFinReportService
             AccountCode = acc.AccountCode,
             AccountName = acc.AccountName,
             OpeningBalance = openBal,
-            TotalDebit = periodLedgers.Where(l => l.DrCr == "dr").Sum(l => l.Amount),
-            TotalCredit = periodLedgers.Where(l => l.DrCr == "cr").Sum(l => l.Amount),
+            TotalDebit = periodLedgers.Sum(l => l.Debit),
+            TotalCredit = periodLedgers.Sum(l => l.Credit),
             ClosingBalance = running,
             Rows = rows
         };
@@ -253,26 +253,25 @@ public class FinReportService : IFinReportService
         var accMap = cashAccs.ToDictionary(a => a.AccountNo);
 
         // Opening balances = cumulative debit-credit up to day before fromDate.
-        // FinLedger uses DrCr ("dr"/"cr") + Amount, not separate Debit/Credit columns.
         var openingDate = fromDate.AddDays(-1);
         var openingLedger = await _db.FinLedgers.AsNoTracking()
             .Where(l => cashAccNos.Contains(l.AccountNo) && l.VoucherDate <= openingDate && l.IsDeleted == 0)
-            .Select(l => new { l.AccountNo, l.DrCr, l.Amount })
+            .Select(l => new { l.AccountNo, l.Debit, l.Credit })
             .ToListAsync(ct);
         var opening = openingLedger
             .GroupBy(l => l.AccountNo)
-            .ToDictionary(g => g.Key, g => g.Sum(l => l.DrCr == "dr" ? l.Amount : -l.Amount));
+            .ToDictionary(g => g.Key, g => g.Sum(l => l.Debit - l.Credit));
 
         // Period movements = debits (receipts) and credits (payments) within [fromDate, toDate].
         var moveLedger = await _db.FinLedgers.AsNoTracking()
             .Where(l => cashAccNos.Contains(l.AccountNo) && l.VoucherDate >= fromDate && l.VoucherDate <= toDate && l.IsDeleted == 0)
-            .Select(l => new { l.AccountNo, l.DrCr, l.Amount })
+            .Select(l => new { l.AccountNo, l.Debit, l.Credit })
             .ToListAsync(ct);
         var move = moveLedger
             .GroupBy(l => l.AccountNo)
             .ToDictionary(g => g.Key, g => (
-                Debits: g.Where(l => l.DrCr == "dr").Sum(l => l.Amount),
-                Credits: g.Where(l => l.DrCr == "cr").Sum(l => l.Amount)
+                Debits: g.Sum(l => l.Debit),
+                Credits: g.Sum(l => l.Credit)
             ));
 
         var rows = new List<Fin1306CashFlowRowDto>();

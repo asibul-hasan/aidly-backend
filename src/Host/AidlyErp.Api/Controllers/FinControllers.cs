@@ -5,6 +5,7 @@ using AidlyErp.Fin.Application.Services;
 namespace AidlyErp.Api.Controllers;
 
 [Route("api/fin/1001")]
+[Route("api/v1/fin/forms/fin1001")]
 public class Fin1001Controller : ApiControllerBase
 {
     private readonly IFin1001Service _service;
@@ -24,25 +25,31 @@ public class Fin1001Controller : ApiControllerBase
 }
 
 [Route("api/fin/1002")]
+[Route("api/v1/fin/forms/fin1002")]
 public class Fin1002Controller : ApiControllerBase
 {
     private readonly IFin1002Service _service;
     public Fin1002Controller(IFin1002Service service) => _service = service;
 
     [HttpGet("account-groups")]
+    [HttpGet("groups")]
     public async Task<IActionResult> GetGroups() => OkResponse(await _service.GetListAsync());
 
     [HttpGet("account-groups/{id:long}")]
+    [HttpGet("groups/{id:long}")]
     public async Task<IActionResult> GetDetail(long id) => OkResponse(await _service.GetDetailAsync(id));
 
     [HttpPost("account-groups")]
+    [HttpPost("groups")]
     public async Task<IActionResult> Save([FromBody] Fin1002AccountGroupDto dto) => OkResponse(await _service.SaveAsync(dto));
 
     [HttpDelete("account-groups/{id:long}")]
+    [HttpDelete("groups/{id:long}")]
     public async Task<IActionResult> Delete(long id) { await _service.DeleteAsync(id); return OkResponse("Account group deleted successfully"); }
 }
 
 [Route("api/fin/1003")]
+[Route("api/v1/fin/forms/fin1003")]
 public class Fin1003Controller : ApiControllerBase
 {
     private readonly IFin1003Service _service;
@@ -62,19 +69,23 @@ public class Fin1003Controller : ApiControllerBase
 }
 
 [Route("api/fin/1004")]
+[Route("api/v1/fin/forms/fin1004")]
 public class Fin1004Controller : ApiControllerBase
 {
     private readonly IFin1004Service _service;
     public Fin1004Controller(IFin1004Service service) => _service = service;
 
     [HttpGet("opening-balances")]
+    [HttpGet("accounts")]
     public async Task<IActionResult> GetAccounts() => OkResponse(await _service.GetAccountsWithOpeningBalanceAsync());
 
     [HttpPost("opening-balances")]
+    [HttpPost("post")]
     public async Task<IActionResult> SaveOpening([FromBody] Fin1004OpeningBalanceDto dto) => OkResponse(await _service.SaveOpeningBalancesAsync(dto));
 }
 
 [Route("api/fin/1005")]
+[Route("api/v1/fin/forms/fin1005")]
 public class Fin1005Controller : ApiControllerBase
 {
     private readonly IFin1005Service _service;
@@ -94,22 +105,27 @@ public class Fin1005Controller : ApiControllerBase
 }
 
 [Route("api/fin/1006")]
+[Route("api/v1/fin/forms/fin1006")]
 public class Fin1006Controller : ApiControllerBase
 {
     private readonly IFin1006Service _service;
     public Fin1006Controller(IFin1006Service service) => _service = service;
 
     [HttpGet("gl-mappings")]
+    [HttpGet("maps")]
     public async Task<IActionResult> GetMaps() => OkResponse(await _service.GetListAsync());
 
     [HttpPost("gl-mappings")]
+    [HttpPost("maps")]
     public async Task<IActionResult> Save([FromBody] Fin1006GlMapDto dto) => OkResponse(await _service.SaveAsync(dto));
 
     [HttpDelete("gl-mappings/{id:long}")]
+    [HttpDelete("maps/{id:long}")]
     public async Task<IActionResult> Delete(long id) { await _service.DeleteAsync(id); return OkResponse("GL map deleted successfully"); }
 }
 
 [Route("api/fin/1101")]
+[Route("api/v1/fin/forms/fin1101")]
 public class Fin1101Controller : ApiControllerBase
 {
     private readonly IFin1101Service _service;
@@ -139,6 +155,7 @@ public class Fin1101Controller : ApiControllerBase
 }
 
 [Route("api/fin/1102")]
+[Route("api/v1/fin/forms/fin1102")]
 public class Fin1102Controller : ApiControllerBase
 {
     private readonly IFin1102Service _service;
@@ -156,6 +173,7 @@ public class Fin1102Controller : ApiControllerBase
 }
 
 [Route("api/fin/1201")]
+[Route("api/v1/fin/forms/fin1201")]
 public class Fin1201Controller : ApiControllerBase
 {
     private readonly IFin1201Service _service;
@@ -169,6 +187,7 @@ public class Fin1201Controller : ApiControllerBase
 }
 
 [Route("api/fin/1301")]
+[Route("api/v1/fin/forms/fin1301")]
 public class Fin1301Controller : ApiControllerBase
 {
     private readonly IFinReportService _service;
@@ -179,17 +198,20 @@ public class Fin1301Controller : ApiControllerBase
 }
 
 [Route("api/fin/1302")]
+[Route("api/v1/fin/forms/fin1302")]
 public class Fin1302Controller : ApiControllerBase
 {
     private readonly IFinReportService _service;
     public Fin1302Controller(IFinReportService service) => _service = service;
 
     [HttpGet("general-ledger")]
+    [HttpGet("ledger")]
     public async Task<IActionResult> GetLedger([FromQuery] long accountNo, [FromQuery] DateTime fromDate, [FromQuery] DateTime toDate) =>
         OkResponse(await _service.GetGeneralLedgerAsync(accountNo, fromDate, toDate));
 }
 
 [Route("api/fin/1303")]
+[Route("api/v1/fin/forms/fin1303")]
 public class Fin1303Controller : ApiControllerBase
 {
     private readonly IFinReportService _service;
@@ -201,17 +223,20 @@ public class Fin1303Controller : ApiControllerBase
 }
 
 [Route("api/fin/1304")]
+[Route("api/v1/fin/forms/fin1304")]
 public class Fin1304Controller : ApiControllerBase
 {
     private readonly IFinReportService _service;
     public Fin1304Controller(IFinReportService service) => _service = service;
 
     [HttpGet("profit-and-loss")]
+    [HttpGet("profit-loss")]
     public async Task<IActionResult> GetPnl([FromQuery] DateTime fromDate, [FromQuery] DateTime toDate) =>
         OkResponse(await _service.GetPnlAsync(fromDate, toDate));
 }
 
 [Route("api/fin/1305")]
+[Route("api/v1/fin/forms/fin1305")]
 public class Fin1305Controller : ApiControllerBase
 {
     private readonly IFinReportService _service;
@@ -223,6 +248,7 @@ public class Fin1305Controller : ApiControllerBase
 }
 
 [Route("api/fin/1306")]
+[Route("api/v1/fin/forms/fin1306")]
 public class Fin1306Controller : ApiControllerBase
 {
     private readonly IFinReportService _service;
@@ -234,17 +260,20 @@ public class Fin1306Controller : ApiControllerBase
 }
 
 [Route("api/fin/1307")]
+[Route("api/v1/fin/forms/fin1307")]
 public class Fin1307Controller : ApiControllerBase
 {
     private readonly IFinReportService _service;
     public Fin1307Controller(IFinReportService service) => _service = service;
 
     [HttpGet("aging-analysis")]
+    [HttpGet("aging")]
     public async Task<IActionResult> GetAging([FromQuery] short partyType, [FromQuery] DateTime asOfDate) =>
         OkResponse(await _service.GetAgingAsync(partyType, asOfDate));
 }
 
 [Route("api/fin/1308")]
+[Route("api/v1/fin/forms/fin1308")]
 public class Fin1308ChartOfAccountsPdfController : ApiControllerBase
 {
     private readonly IFin1308ChartOfAccountsPdfService _service;
@@ -255,6 +284,7 @@ public class Fin1308ChartOfAccountsPdfController : ApiControllerBase
 }
 
 [Route("api/fin/1401")]
+[Route("api/v1/fin/forms/fin1401")]
 public class Fin1401Controller : ApiControllerBase
 {
     private readonly IFin1401Service _service;

@@ -56,8 +56,8 @@ public class Fin1102Service : IFin1102Service
         var lineDtos = new List<Fin1102LedgerLineDto>();
         foreach (var l in ledgerLines)
         {
-            decimal deb = l.DrCr == "dr" ? l.Amount : 0m;
-            decimal cred = l.DrCr == "cr" ? l.Amount : 0m;
+            decimal deb = l.Debit;
+            decimal cred = l.Credit;
             bookBalance += (deb - cred);
 
             if (!clearedLedgerNos.Contains(l.LedgerNo))

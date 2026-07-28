@@ -19,7 +19,7 @@ public class FinVoucher : AuditEntity
     [Column("voucher_type_no")]
     public long VoucherTypeNo { get; set; }
 
-    [Column("voucher_date")]
+    [Column("voucher_date", TypeName = "date")]
     public DateTime VoucherDate { get; set; }
 
     [Column("fin_year_no")]
@@ -209,7 +209,7 @@ public class FinLedger : AuditEntity
     [Column("voucher_dtl_no")]
     public long VoucherDtlNo { get; set; }
 
-    [Column("voucher_date")]
+    [Column("voucher_date", TypeName = "date")]
     public DateTime VoucherDate { get; set; }
 
     // fin_ledger stores signed debit/credit columns, exactly as the Java entity does. There is no
@@ -321,7 +321,7 @@ public class FinBankRecon : AuditEntity
     [Column("account_no")]
     public long AccountNo { get; set; }
 
-    [Column("statement_date")]
+    [Column("statement_date", TypeName = "date")]
     public DateTime StatementDate { get; set; }
 
     [Column("statement_balance")]
@@ -377,7 +377,7 @@ public class FinBankReconLine : AuditEntity
     [NotMapped]
     public long VoucherDtlNo { get; set; }
 
-    [Column("bank_date")]
+    [Column("bank_date", TypeName = "date")]
     public DateTime? ClearedDate { get; set; }
 
     /// <summary>Derived: a line is cleared once the bank date is set. There is no is_cleared column.</summary>
