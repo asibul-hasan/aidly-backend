@@ -493,14 +493,54 @@ app.Use(async (context, next) =>
 app.MapOpenApi("/v3/api-docs/{documentName}.json");
 
 // Serve interactive Swagger UI at /swagger-ui.html matching Java springdoc
-app.UseSwaggerUI(options =>
+app.MapGet("/swagger-ui.html", (HttpContext context) =>
 {
-    options.RoutePrefix = "swagger-ui.html";
-    options.DocumentTitle = "Aidly ERP — API Documentation";
-    foreach (var (groupName, groupTitle) in SwaggerGroups)
-    {
-        options.SwaggerEndpoint($"/v3/api-docs/{groupName}.json", groupTitle);
-    }
+    var html = @"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"">
+    <title>Aidly ERP — API Documentation</title>
+    <link rel=""stylesheet"" href=""https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css"" />
+    <style>
+        html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
+        *, *:before, *:after { box-sizing: inherit; }
+        body { margin:0; background: #fafafa; }
+        .swagger-ui .topbar { background-color: #0f172a; }
+    </style>
+</head>
+<body>
+    <div id=""swagger-ui""></div>
+    <script src=""https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js""></script>
+    <script src=""https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js""></script>
+    <script>
+    window.onload = function() {
+        window.ui = SwaggerUIBundle({
+            urls: [
+                { url: '/v3/api-docs/core.json', name: '1. Core — Authentication' },
+                { url: '/v3/api-docs/sys.json', name: '2. System — Configuration' },
+                { url: '/v3/api-docs/hrm.json', name: '3. HRM — Human Resources' },
+                { url: '/v3/api-docs/fin.json', name: '4. FIN — Finance' },
+                { url: '/v3/api-docs/inv.json', name: '5. INV — Inventory' },
+                { url: '/v3/api-docs/pur.json', name: '6. PUR — Purchase' },
+                { url: '/v3/api-docs/sal.json', name: '7. SAL — Sales' }
+            ],
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+            ],
+            plugins: [
+                SwaggerUIBundle.plugins.DownloadUrl
+            ],
+            layout: 'StandaloneLayout'
+        });
+    };
+    </script>
+</body>
+</html>";
+    context.Response.ContentType = "text/html";
+    return context.Response.WriteAsync(html);
 });
 
 // Redirect /swagger to /swagger-ui.html
