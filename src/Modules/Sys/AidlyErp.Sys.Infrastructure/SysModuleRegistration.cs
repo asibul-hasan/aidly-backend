@@ -15,6 +15,7 @@ public static class SysModuleRegistration
         services.AddModuleDbContext<ISysDbContext, SysDbContext>(connectionString);
 
         // Contracts this module publishes to the rest of the system.
+        services.AddScoped<AidlyErp.Sys.Contracts.ISysUserDirectory, SysUserDirectory>();
         services.AddScoped<AidlyErp.Sys.Contracts.ISysBranchDirectory, SysBranchDirectory>();
         services.AddScoped<AidlyErp.Sys.Contracts.ISysSettingsStore, SysSettingsStore>();
         services.AddScoped<AidlyErp.Sys.Contracts.IDocSequenceGenerator, DocSequenceGenerator>();

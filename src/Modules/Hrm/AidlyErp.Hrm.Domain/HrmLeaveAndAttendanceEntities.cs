@@ -149,6 +149,34 @@ public class HrmLeaveBalance : AuditEntity
     }
 }
 
+/// <summary>
+/// Movement codes for <see cref="HrmLeaveLedger.MovementType"/>, carried over verbatim from the
+/// Java entity's contract (<c>1=OpeningAccrual 2=MonthlyAccrual 3=Consume 4=Reverse 5=Encash
+/// 6=CarryForward 7=Lapse</c>). The column is a <c>smallint</c>; it is not a free-text label.
+/// </summary>
+public static class LeaveMovementType
+{
+    public const short OpeningAccrual = 1;
+    public const short MonthlyAccrual = 2;
+    public const short Consume = 3;
+    public const short Reverse = 4;
+    public const short Encash = 5;
+    public const short CarryForward = 6;
+    public const short Lapse = 7;
+}
+
+/// <summary>
+/// Immutable leave ledger — the append-only audit trail behind every balance.
+///
+/// <para>The .NET port originally mapped <c>movement_type</c> as a 30-char string and omitted
+/// <c>leave_year</c>, <c>balance_after</c>, <c>ref_doc_type</c>, <c>ref_doc_no</c> and
+/// <c>branch_no</c> entirely. The first made every insert fail
+/// (<c>42804: column "movement_type" is of type smallint but expression is of type character
+/// varying</c>); the second would have failed the <c>NOT NULL</c> on <c>leave_year</c> even once
+/// the type was corrected. Both are fixed here, and the ledger now records what it is for —
+/// without <c>balance_after</c> and <c>ref_doc_no</c> a ledger row cannot be traced back to the
+/// document that caused it.</para>
+/// </summary>
 [Table("hrm_leave_ledger")]
 public class HrmLeaveLedger : AuditEntity
 {
@@ -163,15 +191,32 @@ public class HrmLeaveLedger : AuditEntity
     [Column("leave_type_no")]
     public long LeaveTypeNo { get; set; }
 
-    [Column("movement_date")]
-    public DateTime TransDate { get; set; }
+    [Column("leave_year")]
+    public int LeaveYear { get; set; }
 
+    /// <summary>See <see cref="LeaveMovementType"/>.</summary>
+    [Column("movement_type")]
+    public short MovementType { get; set; }
+
+    /// <summary>Signed: positive accrues, negative consumes.</summary>
     [Column("days")]
     public decimal Days { get; set; }
 
-    [Column("movement_type")]
-    [StringLength(30)]
-    public string TransType { get; set; } = string.Empty;
+    [Column("ref_doc_type")]
+    public short? RefDocType { get; set; }
+
+    /// <summary>PK of the document that caused this movement (e.g. the leave application).</summary>
+    [Column("ref_doc_no")]
+    public long? RefDocNo { get; set; }
+
+    [Column("balance_after")]
+    public decimal? BalanceAfter { get; set; }
+
+    [Column("movement_date")]
+    public DateTime TransDate { get; set; }
+
+    [Column("branch_no")]
+    public long? BranchNo { get; set; }
 }
 
 [Table("hrm_leave_policy_setup")]

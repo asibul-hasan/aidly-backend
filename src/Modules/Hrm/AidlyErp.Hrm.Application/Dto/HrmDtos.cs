@@ -1279,6 +1279,15 @@ public class Hrm1301LeaveApplicationDto
     [JsonPropertyName("reliever_name")]
     public string? RelieverName { get; set; }
 
+    [JsonPropertyName("reliever_status")]
+    public short RelieverStatus { get; set; } = 0;
+
+    [JsonPropertyName("reliever_action_at")]
+    public DateTime? RelieverActionAt { get; set; }
+
+    [JsonPropertyName("reliever_remarks")]
+    public string? RelieverRemarks { get; set; }
+
     [JsonPropertyName("attachment_path")]
     public string? AttachmentPath { get; set; }
 

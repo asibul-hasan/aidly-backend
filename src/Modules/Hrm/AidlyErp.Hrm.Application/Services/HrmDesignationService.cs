@@ -34,8 +34,8 @@ public class HrmDesignationService : IHrmDesignationService
     public async Task<List<HrmDesignation>> GetListAsync(CancellationToken ct = default)
     {
         long? branchNo = _ctx.BranchNo;
-        return await _db.HrmDesignations.AsNoTracking()
-            .Where(x => x.IsDeleted == 0 && (branchNo == null || x.BranchNo == branchNo))
+        return await _db.HrmDesignations.AsNoTracking().IgnoreQueryFilters()
+            .Where(x => x.IsDeleted == 0 && (branchNo == null || x.BranchNo == null || x.BranchNo == branchNo))
             .OrderBy(x => x.DesignationNo).ToListAsync(ct);
     }
 

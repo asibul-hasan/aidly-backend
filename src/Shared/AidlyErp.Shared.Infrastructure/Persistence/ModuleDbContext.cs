@@ -90,6 +90,13 @@ public abstract class ModuleDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // MUST run before the filter loop below. Modules use ConfigureModule to Ignore audit
+        // members their table does not actually have (sys_approval_request, sys_doc_sequence).
+        // With this called afterwards, the loop still saw IsDeleted as convention-mapped, attached
+        // a soft-delete filter, and the Ignore then left that filter pointing at an unmapped
+        // member — so EVERY query on those entities failed to translate at runtime.
+        ConfigureModule(modelBuilder);
+
         // ---------------------------------------------------------------------
         // Global query filters — soft delete + multi-tenancy
         //
@@ -127,8 +134,6 @@ public abstract class ModuleDbContext : DbContext
                 SoftDeleteFilterMethod.MakeGenericMethod(clr).Invoke(this, [modelBuilder]);
             }
         }
-
-        ConfigureModule(modelBuilder);
     }
 
     /// <summary>Module-specific mapping: indexes, constraints, <c>IEntityTypeConfiguration</c>s.</summary>

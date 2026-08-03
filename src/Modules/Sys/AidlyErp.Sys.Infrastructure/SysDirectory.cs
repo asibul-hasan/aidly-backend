@@ -5,6 +5,64 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AidlyErp.Sys.Infrastructure;
 
+/// <summary>SYS's side of <see cref="ISysUserDirectory"/>.</summary>
+internal sealed class SysUserDirectory : ISysUserDirectory
+{
+    private const short Deleted = 0;
+
+    private readonly ISysDbContext _db;
+
+    public SysUserDirectory(ISysDbContext db) => _db = db;
+
+    public async Task<long?> FindUserNoByEmployeeNoAsync(long employeeNo,
+                                                          CancellationToken cancellationToken = default)
+    {
+        if (employeeNo <= 0) return null;
+
+        // 0 is the "no employee linked" sentinel on sys_user, so it must never match.
+        var userNo = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.EmployeeNo == employeeNo && u.IsDeleted == Deleted && u.IsActive == 1)
+            .Select(u => u.UserNo)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return userNo == 0 ? null : userNo;
+    }
+
+    public async Task<long?> FindEmployeeNoByUserNoAsync(long userNo,
+                                                          CancellationToken cancellationToken = default)
+    {
+        if (userNo <= 0) return null;
+
+        var employeeNo = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.UserNo == userNo && u.IsDeleted == Deleted)
+            .Select(u => u.EmployeeNo)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // 0 is the "no employee linked" sentinel on sys_user.
+        return employeeNo == 0 ? null : employeeNo;
+    }
+
+    public async Task<IReadOnlyDictionary<long, long>> MapEmployeesToUsersAsync(
+        IReadOnlyCollection<long> employeeNos, CancellationToken cancellationToken = default)
+    {
+        if (employeeNos.Count == 0) return new Dictionary<long, long>();
+
+        var rows = await _db.Users
+            .AsNoTracking()
+            .Where(u => employeeNos.Contains(u.EmployeeNo) && u.IsDeleted == Deleted && u.IsActive == 1)
+            .Select(u => new { u.EmployeeNo, u.UserNo })
+            .ToListAsync(cancellationToken);
+
+        // An employee could in principle have more than one login; take the lowest so the
+        // recipient is deterministic rather than dependent on row order.
+        return rows
+            .GroupBy(r => r.EmployeeNo)
+            .ToDictionary(g => g.Key, g => g.Min(r => r.UserNo));
+    }
+}
+
 /// <summary>SYS's side of <see cref="ISysBranchDirectory"/>.</summary>
 internal sealed class SysBranchDirectory : ISysBranchDirectory
 {

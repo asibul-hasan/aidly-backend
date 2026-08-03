@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using AidlyErp.Hrm.Domain;
 using AidlyErp.Shared.Core.Abstractions;
+using AidlyErp.Shared.Core.Exceptions;
 using AidlyErp.Shared.Contracts;
 using AidlyErp.Sys.Contracts;
 using AidlyErp.Hrm.Application.Interfaces;
@@ -88,7 +89,7 @@ public class LeaveRuleEngine : ILeaveRuleEngine
 
         if (days <= 0)
         {
-            throw new InvalidOperationException("The selected range contains no working days after excluding weekends/holidays");
+            throw new ValidationException("The selected range contains no working days after excluding weekends/holidays");
         }
 
         decimal total = days;
@@ -119,10 +120,10 @@ public class LeaveRuleEngine : ILeaveRuleEngine
         {
             decimal? overdraft = rules.Rule?.MaxOverdraftDays;
             if (overdraft == null || shortfall <= overdraft) return;
-            throw new InvalidOperationException($"Overdraft limit exceeded: short by {shortfall:0.##} day(s), maximum allowed overdraft is {overdraft:0.##}.");
+            throw new ValidationException($"Overdraft limit exceeded: short by {shortfall:0.##} day(s), maximum allowed overdraft is {overdraft:0.##}.");
         }
 
-        throw new InvalidOperationException($"Insufficient leave balance: available {availableDays:0.##}, requested {requestedDays:0.##}.");
+        throw new ValidationException($"Insufficient leave balance: available {availableDays:0.##}, requested {requestedDays:0.##}.");
     }
 
     private async Task<HashSet<DateTime>> GetHolidayDatesAsync(long? branchNo, DateTime fromDate, DateTime toDate, CancellationToken cancellationToken)
@@ -155,7 +156,7 @@ public class LeaveRuleEngine : ILeaveRuleEngine
         long served = (long)((DateTime.UtcNow.Date - employee.JoiningDate.Date).TotalDays / 30.4375);
         if (served < months)
         {
-            throw new InvalidOperationException($"{type.LeaveTypeName} requires {months} month(s) of service; this employee has completed {Math.Max(served, 0)}.");
+            throw new ValidationException($"{type.LeaveTypeName} requires {months} month(s) of service; this employee has completed {Math.Max(served, 0)}.");
         }
     }
 
@@ -166,11 +167,11 @@ public class LeaveRuleEngine : ILeaveRuleEngine
 
         if (min != null && min > 0 && totalDays < min)
         {
-            throw new InvalidOperationException($"{type.LeaveTypeName} must be at least {min:0.##} day(s) per application.");
+            throw new ValidationException($"{type.LeaveTypeName} must be at least {min:0.##} day(s) per application.");
         }
         if (max != null && max > 0 && totalDays > max)
         {
-            throw new InvalidOperationException($"{type.LeaveTypeName} cannot exceed {max:0.##} day(s) per application.");
+            throw new ValidationException($"{type.LeaveTypeName} cannot exceed {max:0.##} day(s) per application.");
         }
     }
 
@@ -185,7 +186,7 @@ public class LeaveRuleEngine : ILeaveRuleEngine
             long lead = (long)(fromDate - today).TotalDays;
             if (lead < notice)
             {
-                throw new InvalidOperationException($"This leave type requires {notice} day(s) advance notice; only {lead} day(s) given.");
+                throw new ValidationException($"This leave type requires {notice} day(s) advance notice; only {lead} day(s) given.");
             }
         }
 
@@ -195,7 +196,7 @@ public class LeaveRuleEngine : ILeaveRuleEngine
             long back = (long)(today - fromDate).TotalDays;
             if (back > maxBack)
             {
-                throw new InvalidOperationException($"Back-dated leave is limited to {maxBack} day(s); this request is {back} day(s) in the past.");
+                throw new ValidationException($"Back-dated leave is limited to {maxBack} day(s); this request is {back} day(s) in the past.");
             }
         }
     }
@@ -217,7 +218,7 @@ public class LeaveRuleEngine : ILeaveRuleEngine
         var clash = await query.FirstOrDefaultAsync(cancellationToken);
         if (clash != null)
         {
-            throw new InvalidOperationException($"Overlapping leave: this employee already has a request from {clash.FromDate:yyyy-MM-dd} to {clash.ToDate:yyyy-MM-dd}.");
+            throw new ValidationException($"Overlapping leave: this employee already has a request from {clash.FromDate:yyyy-MM-dd} to {clash.ToDate:yyyy-MM-dd}.");
         }
     }
 
@@ -249,7 +250,7 @@ public class LeaveRuleEngine : ILeaveRuleEngine
 
         if (projected > capPercent)
         {
-            throw new InvalidOperationException($"Department leave limit reached: {projected:0.##}% would be on leave for this period (allowed {capPercent:0.##}%). {onLeave} of {headCount} staff are already on leave.");
+            throw new ValidationException($"Department leave limit reached: {projected:0.##}% would be on leave for this period (allowed {capPercent:0.##}%). {onLeave} of {headCount} staff are already on leave.");
         }
     }
 
@@ -257,7 +258,7 @@ public class LeaveRuleEngine : ILeaveRuleEngine
     {
         if (rules.HasRule && FlagOn(rules.Rule?.IsRelieverMandatory) && relieverEmployeeNo == null)
         {
-            throw new InvalidOperationException("A reliever is mandatory for this leave type.");
+            throw new ValidationException("A reliever is mandatory for this leave type.");
         }
     }
 
@@ -270,14 +271,14 @@ public class LeaveRuleEngine : ILeaveRuleEngine
         {
             if (totalDays > afterDays && !hasAttachment)
             {
-                throw new InvalidOperationException($"Supporting document is required for {type.LeaveTypeName} longer than {afterDays:0.##} day(s).");
+                throw new ValidationException($"Supporting document is required for {type.LeaveTypeName} longer than {afterDays:0.##} day(s).");
             }
             return;
         }
 
         if (FlagOn(type.DocumentationRequired) && !hasAttachment)
         {
-            throw new InvalidOperationException($"Supporting document is required for {type.LeaveTypeName}.");
+            throw new ValidationException($"Supporting document is required for {type.LeaveTypeName}.");
         }
     }
 
@@ -285,7 +286,7 @@ public class LeaveRuleEngine : ILeaveRuleEngine
     {
         if (rules.HasRule && FlagOn(rules.Rule?.IsShiftCritical))
         {
-            throw new InvalidOperationException("This leave type is blocked for critical shifts; a management override is required.");
+            throw new ValidationException("This leave type is blocked for critical shifts; a management override is required.");
         }
     }
 

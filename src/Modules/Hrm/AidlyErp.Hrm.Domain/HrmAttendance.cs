@@ -1,11 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using AidlyErp.Shared.Core;
+using AidlyErp.Shared.Core.Security;
 
 namespace AidlyErp.Hrm.Domain;
 
 [Table("hrm_attendance")]
-public class HrmAttendance : AuditEntity, IBranchScopedEntity
+public class HrmAttendance : AuditEntity, IBranchScopedEntity, IEmployeeOwnedEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -14,6 +15,9 @@ public class HrmAttendance : AuditEntity, IBranchScopedEntity
 
     [Column("employee_no")]
     public long EmployeeNo { get; set; }
+
+    /// <summary>Marker for the EMPLOYEE data scope; the filter binds the concrete column above.</summary>
+    long? IEmployeeOwnedEntity.EmployeeNo => EmployeeNo;
 
     [Column("att_date")]
     public DateTime AttDate { get; set; }

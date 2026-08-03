@@ -174,7 +174,8 @@ public class BranchService : IBranchService
     public async Task<List<BranchDto>> GetListAsync(CancellationToken cancellationToken = default)
     {
         var userNo = _ctx.UserNo;
-        if (userNo == null) return new List<BranchDto>();
+        var companyNo = _ctx.CompanyNo;
+        if (userNo == null || companyNo == null) return new List<BranchDto>();
 
         var branchNos = await _db.UserBranches
             .AsNoTracking()
@@ -186,7 +187,7 @@ public class BranchService : IBranchService
         if (branchNos.Count == 0) return new List<BranchDto>();
 
         return (await _db.Branches.AsNoTracking().IgnoreQueryFilters()
-                .Where(b => branchNos.Contains(b.BranchNo) && b.IsDeleted == Deleted)
+                .Where(b => b.CompanyNo == companyNo && branchNos.Contains(b.BranchNo) && b.IsDeleted == Deleted)
                 .ToListAsync(cancellationToken))
             .Select(ToDto).ToList();
     }

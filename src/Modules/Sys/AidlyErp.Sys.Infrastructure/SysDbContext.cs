@@ -44,6 +44,8 @@ public class SysDbContext : ModuleDbContext, ISysDbContext
     public DbSet<UserCompany> UserCompanies => Set<UserCompany>();
     public DbSet<UserWarehouse> UserWarehouses => Set<UserWarehouse>();
     public DbSet<Department> Departments => Set<Department>();
+    public DbSet<SysNotification> Notifications => Set<SysNotification>();
+    public DbSet<SysNotificationTemplate> NotificationTemplates => Set<SysNotificationTemplate>();
 
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {

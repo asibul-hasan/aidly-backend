@@ -1,3 +1,5 @@
+using AidlyErp.Shared.Core.Security;
+
 namespace AidlyErp.Shared.Core;
 
 /// <summary>
@@ -58,11 +60,18 @@ public static class AccessScopeExtensions
 ///   bit3 (8)  DELETE  (cancel / void)
 ///   bit4 (16) APPROVE (reject)
 ///   bit5 (32) OWN     record_filter == OWN (record-level narrowing to created_by = caller)
+///   bit6-7    SCOPE   data_scope (1 = BRANCH, 2 = DEPARTMENT, 3 = EMPLOYEE); 0 = unset
 /// </code>
 ///
 /// <para>The action → required-bit mapping mirrors the legacy DB-backed resolver
 /// (<c>RbacAuthorizationService.ResolveAccess</c>) so behaviour is identical — only the
 /// data source moved from a per-request query to a signed token claim.</para>
+///
+/// <para><c>data_scope</c> rides in the same int because the claim is already a
+/// <c>formId → int</c> map: a separate claim would double the token's permission payload for
+/// two bits of information. Tokens issued before this change decode scope 0, which
+/// <see cref="DataScopeConstants.Normalize"/> maps to the widest setting — so they keep
+/// behaving exactly as they did.</para>
 /// </summary>
 public static class PermissionBits
 {
@@ -73,9 +82,20 @@ public static class PermissionBits
     public const int Approve = 16;
     public const int Own = 32;
 
+    /// <summary>Bit offset of the 2-bit <c>data_scope</c> field.</summary>
+    public const int ScopeShift = 6;
+
+    /// <summary>Mask of the 2-bit <c>data_scope</c> field, already shifted into place.</summary>
+    public const int ScopeMask = 0b11 << ScopeShift;
+
     /// <summary>Builds the mask for one form from its resolved permission flags.</summary>
     public static int Encode(bool canView, bool canInsert, bool canUpdate,
-                             bool canDelete, bool canApprove, bool ownOnly)
+                             bool canDelete, bool canApprove, bool ownOnly) =>
+        Encode(canView, canInsert, canUpdate, canDelete, canApprove, ownOnly, DataScopeConstants.Default);
+
+    /// <summary>Builds the mask for one form, including its row-level <paramref name="dataScope"/>.</summary>
+    public static int Encode(bool canView, bool canInsert, bool canUpdate,
+                             bool canDelete, bool canApprove, bool ownOnly, short dataScope)
     {
         var mask = 0;
         if (canView) mask |= View;
@@ -84,8 +104,16 @@ public static class PermissionBits
         if (canDelete) mask |= Delete;
         if (canApprove) mask |= Approve;
         if (ownOnly) mask |= Own;
+        mask |= (DataScopeConstants.Normalize(dataScope) & 0b11) << ScopeShift;
         return mask;
     }
+
+    /// <summary>
+    /// Reads the form's <c>data_scope</c> out of <paramref name="mask"/>. A mask written before
+    /// the scope field existed decodes 0, which normalizes to the widest scope.
+    /// </summary>
+    public static short DataScopeOf(int mask) =>
+        DataScopeConstants.Normalize((short)((mask & ScopeMask) >> ScopeShift));
 
     /// <summary>The single permission bit an HTTP action requires (matches the legacy resolver's switch).</summary>
     public static int RequiredBit(string? action) =>

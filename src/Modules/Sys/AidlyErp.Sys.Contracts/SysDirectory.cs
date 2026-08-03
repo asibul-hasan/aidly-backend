@@ -35,6 +35,35 @@ public sealed record FinPeriodInfo(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// <summary>Branch reference data. Branches are SYS master data that every module validates against.</summary>
+/// <summary>
+/// Resolves the login behind an employee, so a module that only knows employee numbers can
+/// address a notification to a person.
+///
+/// <para>HRM stores employees; notifications target <c>sys_user</c>. Without this, an HRM feature
+/// like "tell the reliever they have been named on a leave" has no way to find the recipient —
+/// which is exactly why that notification was never built.</para>
+/// </summary>
+public interface ISysUserDirectory
+{
+    /// <summary>
+    /// The active, non-deleted user linked to <paramref name="employeeNo"/>, or <c>null</c> when
+    /// that employee has no login (common — not every employee is a system user).
+    /// </summary>
+    Task<long?> FindUserNoByEmployeeNoAsync(long employeeNo, CancellationToken cancellationToken = default);
+
+    /// <summary>Employee number → user number for a set of employees, in one query.</summary>
+    Task<IReadOnlyDictionary<long, long>> MapEmployeesToUsersAsync(IReadOnlyCollection<long> employeeNos,
+                                                                   CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The employee behind a login — the reverse of
+    /// <see cref="FindUserNoByEmployeeNoAsync"/>. Needed wherever a module must check that the
+    /// acting user IS the employee a record names (a reliever answering their own request, say),
+    /// since HRM knows employees and only SYS knows logins.
+    /// </summary>
+    Task<long?> FindEmployeeNoByUserNoAsync(long userNo, CancellationToken cancellationToken = default);
+}
+
 public interface ISysBranchDirectory
 {
     Task<bool> ExistsAsync(long branchNo, CancellationToken cancellationToken = default);

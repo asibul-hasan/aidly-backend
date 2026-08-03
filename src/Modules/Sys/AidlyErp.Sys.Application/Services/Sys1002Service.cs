@@ -51,10 +51,12 @@ public class Sys1002Service : ISys1002Service
 
     public async Task<List<Sys1002BranchDto>> GetBranchListAsync(CancellationToken cancellationToken = default)
     {
+        var companyNo = _ctx.CompanyNo ?? throw new ValidationException("No active company in context");
+
         // All branches for the current company, ascending by branch_no.
         var branches = await _db.Branches
             .AsNoTracking()
-            .Where(b => b.IsDeleted == Deleted)
+            .Where(b => b.CompanyNo == companyNo && b.IsDeleted == Deleted)
             .OrderBy(b => b.BranchNo)
             .ToListAsync(cancellationToken);
 
@@ -107,12 +109,14 @@ public class Sys1002Service : ISys1002Service
 
     private async Task<Sys1002BranchDto> InsertAsync(Sys1002BranchDto dto, CancellationToken ct)
     {
+        var companyNo = _ctx.CompanyNo ?? throw new ValidationException("No active company in context");
+
         var companyExists = await _db.Companies
-            .AnyAsync(c => c.CompanyNo == dto.CompanyNo && c.IsDeleted == Deleted, ct);
+            .AnyAsync(c => c.CompanyNo == companyNo && c.IsDeleted == Deleted, ct);
 
         if (!companyExists)
         {
-            throw new NotFoundException("Company not found: companyNo=" + dto.CompanyNo);
+            throw new NotFoundException("Company not found: companyNo=" + companyNo);
         }
 
         if (string.IsNullOrWhiteSpace(dto.BranchId))
@@ -122,7 +126,7 @@ public class Sys1002Service : ISys1002Service
         else
         {
             var duplicate = await _db.Branches
-                .AnyAsync(b => b.CompanyNo == dto.CompanyNo && b.BranchId == dto.BranchId && b.IsDeleted == Deleted, ct);
+                .AnyAsync(b => b.CompanyNo == companyNo && b.BranchId == dto.BranchId && b.IsDeleted == Deleted, ct);
 
             if (duplicate)
             {
@@ -133,7 +137,7 @@ public class Sys1002Service : ISys1002Service
         if (IsMain(dto.IsMainBranch))
         {
             var existingMain = await _db.Branches
-                .FirstOrDefaultAsync(b => b.CompanyNo == dto.CompanyNo && b.IsMainBranch == Active
+                .FirstOrDefaultAsync(b => b.CompanyNo == companyNo && b.IsMainBranch == Active
                                           && b.IsDeleted == Deleted, ct);
 
             if (existingMain != null)
@@ -143,7 +147,7 @@ public class Sys1002Service : ISys1002Service
             }
         }
 
-        var entity = new Branch();
+        var entity = new Branch { CompanyNo = companyNo };
         ApplyDtoToEntity(dto, entity);
 
         _db.Branches.Add(entity);
@@ -157,8 +161,10 @@ public class Sys1002Service : ISys1002Service
 
     private async Task<Sys1002BranchDto> UpdateAsync(long branchNo, Sys1002BranchDto dto, CancellationToken ct)
     {
+        var companyNo = _ctx.CompanyNo ?? throw new ValidationException("No active company in context");
+
         var entity = await _db.Branches
-                         .FirstOrDefaultAsync(b => b.BranchNo == branchNo && b.IsDeleted == Deleted, ct)
+                         .FirstOrDefaultAsync(b => b.BranchNo == branchNo && b.CompanyNo == companyNo && b.IsDeleted == Deleted, ct)
                      ?? throw new NotFoundException("Branch not found: branchNo=" + branchNo);
 
         // is_main_branch cannot be changed after creation
@@ -168,7 +174,7 @@ public class Sys1002Service : ISys1002Service
         if (dto.BranchId != null)
         {
             var existing = await _db.Branches
-                .FirstOrDefaultAsync(b => b.CompanyNo == dto.CompanyNo && b.BranchId == dto.BranchId
+                .FirstOrDefaultAsync(b => b.CompanyNo == companyNo && b.BranchId == dto.BranchId
                                           && b.IsDeleted == Deleted, ct);
 
             if (existing != null && existing.BranchNo != branchNo)
@@ -233,7 +239,6 @@ public class Sys1002Service : ISys1002Service
 
     private static void ApplyDtoToEntity(Sys1002BranchDto dto, Branch e)
     {
-        if (dto.CompanyNo != null) e.CompanyNo = dto.CompanyNo;
         if (dto.BranchId != null) e.BranchId = dto.BranchId;
         if (dto.BranchName != null) e.BranchName = dto.BranchName;
         if (dto.BranchNameNls != null) e.BranchNameNls = dto.BranchNameNls;

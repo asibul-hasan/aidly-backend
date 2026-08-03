@@ -15,6 +15,16 @@ public interface ISys1108Service
 {
     Task<List<Sys1108ScopeDto>> GetListAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Workflow list; a null filter means "all" for that column.</summary>
+    Task<List<Sys1108ScopeDto>> GetListAsync(long? branchNo, long? departmentNo, long? menuNo,
+                                             CancellationToken cancellationToken = default);
+
+    /// <summary>Steps of one workflow, in approval order.</summary>
+    Task<List<Sys1108StepDto>> GetStepsAsync(long scopeNo, CancellationToken cancellationToken = default);
+
+    /// <summary>Approvers of one step.</summary>
+    Task<List<Sys1108ApproverDto>> GetApproversAsync(long stepNo, CancellationToken cancellationToken = default);
+
     Task<List<SysLookupDto>> GetEnrolledMenuOptionsAsync(CancellationToken cancellationToken = default);
 
     Task<Sys1108ScopeDto> SaveAsync(Sys1108ScopeDto dto, CancellationToken cancellationToken = default);
@@ -41,23 +51,122 @@ public class Sys1108Service : ISys1108Service
         _ctx = ctx;
     }
 
-    public async Task<List<Sys1108ScopeDto>> GetListAsync(CancellationToken cancellationToken = default)
+    public Task<List<Sys1108ScopeDto>> GetListAsync(CancellationToken cancellationToken = default) =>
+        GetListAsync(null, null, null, cancellationToken);
+
+    /// <summary>
+    /// Workflow list with optional branch / department / menu filters.
+    ///
+    /// <para>Returns the scope rows ONLY — steps and approvers load per selection via
+    /// <see cref="GetStepsAsync"/> / <see cref="GetApproversAsync"/>. Nesting them here meant a
+    /// query per scope plus one per step (a classic N+1) on every list load, for children the
+    /// screen shows one workflow at a time anyway.</para>
+    /// </summary>
+    public async Task<List<Sys1108ScopeDto>> GetListAsync(long? branchNo, long? departmentNo, long? menuNo,
+                                                          CancellationToken cancellationToken = default)
     {
         var companyNo = Company();
 
         var scopes = await _db.ApprovalScopes
             .AsNoTracking()
             .Where(s => s.CompanyNo == companyNo && s.IsDeleted == Deleted)
+            .Where(s => branchNo == null || s.BranchNo == branchNo)
+            .Where(s => departmentNo == null || s.DepartmentNo == departmentNo)
+            .Where(s => menuNo == null || s.MenuNo == menuNo)
             .OrderBy(s => s.ScopeNo)
             .ToListAsync(cancellationToken);
 
-        var result = new List<Sys1108ScopeDto>(scopes.Count);
-        foreach (var scope in scopes)
-        {
-            result.Add(await ToDtoAsync(scope, cancellationToken));
-        }
+        if (scopes.Count == 0) return new List<Sys1108ScopeDto>();
 
-        return result;
+        // One grouped count for the whole page rather than a count per row — the list needs to
+        // know which workflows still have children (their delete is hidden in the UI).
+        var scopeNos = scopes.Select(s => s.ScopeNo).ToList();
+        var stepCounts = await _db.ApprovalSteps
+            .AsNoTracking()
+            .Where(s => scopeNos.Contains(s.ScopeNo))
+            .GroupBy(s => s.ScopeNo)
+            .Select(g => new { ScopeNo = g.Key, Count = (long)g.Count() })
+            .ToDictionaryAsync(x => x.ScopeNo, x => x.Count, cancellationToken);
+
+        return scopes.Select(s => new Sys1108ScopeDto
+        {
+            ScopeNo = s.ScopeNo,
+            WorkflowName = s.WorkflowName,
+            BranchNo = s.BranchNo,
+            DepartmentNo = s.DepartmentNo,
+            MenuNo = s.MenuNo,
+            IsActive = s.IsActive,
+            RowVersion = s.RowVersion,
+            StepCount = stepCounts.TryGetValue(s.ScopeNo, out var c) ? c : 0,
+        }).ToList();
+    }
+
+    public async Task<List<Sys1108StepDto>> GetStepsAsync(long scopeNo, CancellationToken cancellationToken = default)
+    {
+        await RequireOwnScopeAsync(scopeNo, cancellationToken);
+
+        var steps = await _db.ApprovalSteps
+            .AsNoTracking()
+            .Where(s => s.ScopeNo == scopeNo)
+            .OrderBy(s => s.StepNumber)
+            .ToListAsync(cancellationToken);
+
+        if (steps.Count == 0) return new List<Sys1108StepDto>();
+
+        var stepNos = steps.Select(s => s.StepNo).ToList();
+        var approverCounts = await _db.StepApprovers
+            .AsNoTracking()
+            .Where(a => stepNos.Contains(a.StepNo))
+            .GroupBy(a => a.StepNo)
+            .Select(g => new { StepNo = g.Key, Count = (long)g.Count() })
+            .ToDictionaryAsync(x => x.StepNo, x => x.Count, cancellationToken);
+
+        return steps.Select(s => new Sys1108StepDto
+        {
+            StepNo = s.StepNo,
+            StepNumber = s.StepNumber,
+            StepType = s.StepType,
+            NextStepNo = s.NextStepNo,
+            StepName = s.StepName,
+            IsFinal = s.IsFinal,
+            IsActive = s.IsActive,
+            ApproverCount = approverCounts.TryGetValue(s.StepNo, out var c) ? c : 0,
+        }).ToList();
+    }
+
+    public async Task<List<Sys1108ApproverDto>> GetApproversAsync(long stepNo, CancellationToken cancellationToken = default)
+    {
+        var step = await _db.ApprovalSteps.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.StepNo == stepNo, cancellationToken)
+            ?? throw new NotFoundException("Approval step not found");
+
+        await RequireOwnScopeAsync(step.ScopeNo, cancellationToken);
+
+        return await _db.StepApprovers
+            .AsNoTracking()
+            .Where(a => a.StepNo == stepNo)
+            .OrderBy(a => a.ApproverNo)
+            .Select(a => new Sys1108ApproverDto
+            {
+                ApproverNo = a.ApproverNo,
+                EmpNo = a.EmpNo,
+                IsActive = a.IsActive,
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// A scope_no / step_no arriving from the client must be proven to belong to the caller's
+    /// company — without this the child endpoints would read another company's workflow by id.
+    /// </summary>
+    private async Task RequireOwnScopeAsync(long scopeNo, CancellationToken cancellationToken)
+    {
+        var companyNo = Company();
+        var exists = await _db.ApprovalScopes.AsNoTracking()
+            .AnyAsync(s => s.ScopeNo == scopeNo && s.CompanyNo == companyNo && s.IsDeleted == Deleted,
+                      cancellationToken);
+
+        if (!exists) throw new NotFoundException("Approval scope not found");
     }
 
     /// <summary>

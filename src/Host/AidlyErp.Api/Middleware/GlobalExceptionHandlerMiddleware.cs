@@ -130,49 +130,89 @@ public class GlobalExceptionHandlerMiddleware
                 return ((int)HttpStatusCode.Unauthorized,
                     ApiResponse<object>.Error((int)HttpStatusCode.Unauthorized, ex.Message));
 
-            // --- Anything else -> 500, exposing only the exception type name ---
+            // --- Anything else ---
             default:
+            {
+                // A PostgreSQL failure is very often NOT the outermost exception: EF wraps provider
+                // errors (a pool exhaustion arrives as InvalidOperationException "…likely due to a
+                // transient failure"). Checking the whole chain here is what stops a real, specific
+                // database error being reported as a bare "Internal server error".
+                var pg = PostgresErrorTranslator.Find(exception);
+                if (pg != null) return TranslatePostgres(pg, exception);
+
                 _logger.LogError(exception, "Unexpected [{Type}]: {Message}",
                     exception.GetType().Name, exception.Message);
+
+                // The message is included rather than withheld. "Check server logs" is useless to
+                // whoever is looking at the screen, and this is an internal business application —
+                // the operator seeing the real reason is worth more than the marginal disclosure.
                 return ((int)HttpStatusCode.InternalServerError,
                     ApiResponse<object>.Error((int)HttpStatusCode.InternalServerError,
-                        $"Internal server error [{exception.GetType().Name}]. Check server logs for details."));
+                        Readable(exception)));
+            }
         }
     }
 
     /// <summary>
-    /// Mirrors the Java <c>handleDatabaseException</c>: unwraps to the most specific cause and
-    /// rewrites well-known PostgreSQL failures into actionable messages.
+    /// Renders an unexpected exception as one readable line, without leaking a stack trace or
+    /// anything multi-line into the response body.
+    /// </summary>
+    private static string Readable(Exception exception)
+    {
+        var message = exception.Message?.Trim();
+
+        if (string.IsNullOrWhiteSpace(message))
+            return $"Unexpected error ({exception.GetType().Name}). Please contact support.";
+
+        // Collapse to the first line so a multi-line framework message cannot spill into the UI.
+        var firstLine = message.Split('\n', '\r')[0].Trim();
+
+        return firstLine.Length > 300 ? firstLine[..300] + "…" : firstLine;
+    }
+
+    /// <summary>
+    /// Translates a database failure.
+    ///
+    /// <para>Previously this matched on English substrings of the message ("violates foreign key
+    /// constraint", "does not exist"), which covered four cases, broke under a different server
+    /// locale, and returned 500 for everything — including duplicate keys, which are the caller's
+    /// mistake, not a server fault. <see cref="PostgresErrorTranslator"/> keys on
+    /// <c>SqlState</c> instead and picks the status to match.</para>
     /// </summary>
     private (int StatusCode, object Payload) TranslateDataAccess(Exception ex)
     {
+        var pg = PostgresErrorTranslator.Find(ex);
+
+        if (pg != null) return TranslatePostgres(pg, ex);
+
+        // Not a PostgreSQL error (a provider/transport fault, say) — report what it said.
         var cause = MostSpecificCause(ex);
-        var detailMessage = cause.Message ?? "(no details)";
-        var causeType = cause.GetType().Name;
-        var userFriendlyMessage = "Database Error: " + detailMessage;
+        _logger.LogError(ex, "Database error [{CauseType}]: {Detail}", cause.GetType().Name, cause.Message);
 
-        if (detailMessage.Contains("column", StringComparison.OrdinalIgnoreCase)
-            && detailMessage.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
-        {
-            userFriendlyMessage = "Schema Mismatch: A required column is missing in the database table. Details: " + detailMessage;
-        }
-        else if (detailMessage.Contains("relation", StringComparison.OrdinalIgnoreCase)
-                 && detailMessage.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
-        {
-            userFriendlyMessage = "Schema Mismatch: A required table is missing. Details: " + detailMessage;
-        }
-        else if (detailMessage.Contains("violates foreign key constraint", StringComparison.OrdinalIgnoreCase))
-        {
-            userFriendlyMessage = "Data Integrity Error: This record is linked to other data and cannot be modified/deleted. Details: " + detailMessage;
-        }
-        else if (detailMessage.Contains("syntax error", StringComparison.OrdinalIgnoreCase))
-        {
-            userFriendlyMessage = "Query Syntax Error: " + detailMessage;
-        }
-
-        _logger.LogError(ex, "Database error [{CauseType}]: {Detail}", causeType, detailMessage);
         return ((int)HttpStatusCode.InternalServerError,
-            ApiResponse<object>.Error((int)HttpStatusCode.InternalServerError, userFriendlyMessage));
+            ApiResponse<object>.Error((int)HttpStatusCode.InternalServerError,
+                $"Database error: {Readable(cause)}"));
+    }
+
+    private (int StatusCode, object Payload) TranslatePostgres(PostgresException pg, Exception original)
+    {
+        var (status, message) = PostgresErrorTranslator.Translate(pg);
+
+        // 4xx is the caller's data, not a fault — log it as a warning so real faults stay findable.
+        if (status < 500)
+        {
+            _logger.LogWarning(
+                "Database rejected the request [{SqlState}] on {Table}.{Column} ({Constraint}): {Detail}",
+                pg.SqlState, pg.TableName, pg.ColumnName, pg.ConstraintName, pg.MessageText);
+        }
+        else
+        {
+            _logger.LogError(original,
+                "Database error [{SqlState}] on {Table}.{Column} ({Constraint}): {Detail}",
+                pg.SqlState, pg.TableName, pg.ColumnName, pg.ConstraintName, pg.MessageText);
+        }
+
+        return (status, ApiResponse<object>.Error(status, message));
     }
 
     /// <summary>Equivalent of Spring's <c>DataAccessException.getMostSpecificCause()</c>.</summary>

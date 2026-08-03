@@ -116,6 +116,7 @@ public class Sys1103Service : ISys1103Service
                 rp.CanExport = Flag(row.CanExport);
                 rp.PermScope = Scope(row.PermScope);
                 rp.RecordFilter = RecordFilterOf(row.RecordFilter);
+                rp.DataScope = DataScopeOf(row.DataScope);
                 rp.IsActive = 1;
             }
 
@@ -165,7 +166,9 @@ public class Sys1103Service : ISys1103Service
                    MAX(COALESCE(rp.can_cancel, 0))    AS "CanCancel",
                    MAX(COALESCE(rp.can_export, 0))    AS "CanExport",
                    MAX(COALESCE(rp.perm_scope, 2))    AS "PermScope",
-                   MAX(COALESCE(rp.record_filter, 1)) AS "RecordFilter"
+                   MAX(COALESCE(rp.record_filter, 1)) AS "RecordFilter",
+                   -- MIN mirrors the RBAC resolver: lower = wider, so the widest grant wins.
+                   MIN(COALESCE(rp.data_scope, 1))    AS "DataScope"
             FROM   sys_menu m
             JOIN   sys_submodule sm ON sm.submodule_no = m.submodule_no
                                 AND sm.is_active = 1 AND sm.is_deleted = 0
@@ -205,7 +208,8 @@ public class Sys1103Service : ISys1103Service
         CanCancel = S(r.CanCancel),
         CanExport = S(r.CanExport),
         PermScope = r.PermScope != null ? (short)r.PermScope.Value : (short)2,
-        RecordFilter = r.RecordFilter != null ? (short)r.RecordFilter.Value : (short)1
+        RecordFilter = r.RecordFilter != null ? (short)r.RecordFilter.Value : (short)1,
+        DataScope = r.DataScope != null ? (short)r.DataScope.Value : DataScopeConstants.Branch
     };
 
     /// <summary>Any positive value reads as granted; everything else as denied.</summary>
@@ -219,6 +223,14 @@ public class Sys1103Service : ISys1103Service
 
     /// <summary>2 = OWN; anything else falls back to 1 = ALL.</summary>
     private static short RecordFilterOf(short? v) => (short)(v == 2 ? 2 : 1);
+
+    /// <summary>2 = DEPARTMENT, 3 = EMPLOYEE; anything else falls back to 1 = BRANCH (no narrowing).</summary>
+    private static short DataScopeOf(short? v) => v switch
+    {
+        DataScopeConstants.Department => DataScopeConstants.Department,
+        DataScopeConstants.Employee => DataScopeConstants.Employee,
+        _ => DataScopeConstants.Branch
+    };
 
     /// <summary>Projection for <see cref="FindRoleMatrixAsync"/>; names match the SQL aliases.</summary>
     private sealed class MatrixRow
@@ -240,5 +252,6 @@ public class Sys1103Service : ISys1103Service
         public int? CanExport { get; set; }
         public int? PermScope { get; set; }
         public int? RecordFilter { get; set; }
+        public int? DataScope { get; set; }
     }
 }

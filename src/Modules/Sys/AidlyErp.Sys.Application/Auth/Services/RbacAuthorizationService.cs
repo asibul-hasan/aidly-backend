@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AidlyErp.Sys.Application.Auth.Services;
 
 /// <summary>Combined access decision for the request authorization filter.</summary>
-public readonly record struct FormAccess(bool Allowed, int RecordFilter);
+public readonly record struct FormAccess(bool Allowed, int RecordFilter, short DataScope);
 
 public interface IRbacAuthorizationService
 {
@@ -290,7 +290,7 @@ public class RbacAuthorizationService : IRbacAuthorizationService
 
         if (p.Denied)
         {
-            return new FormAccess(false, p.RecordFilter);
+            return new FormAccess(false, p.RecordFilter, p.DataScope);
         }
 
         var allowed = (action ?? "view").ToLowerInvariant() switch
@@ -303,7 +303,7 @@ public class RbacAuthorizationService : IRbacAuthorizationService
             _ => p.CanView
         };
 
-        return new FormAccess(allowed, p.RecordFilter);
+        return new FormAccess(allowed, p.RecordFilter, p.DataScope);
     }
 
     public void EvictPermissionCache() => PermCache.Clear();
@@ -313,7 +313,7 @@ public class RbacAuthorizationService : IRbacAuthorizationService
     // =========================================================================
 
     private readonly record struct PermSnapshot(bool Denied, bool CanView, bool CanInsert, bool CanUpdate,
-                                                bool CanDelete, bool CanApprove, int RecordFilter, long ExpiresAt);
+                                                bool CanDelete, bool CanApprove, int RecordFilter, short DataScope, long ExpiresAt);
 
     /// <summary>Cache-aware resolve. On a hit, NO database round trip happens.</summary>
     private async Task<PermSnapshot> PermissionSnapshotAsync(long userNo, long? companyNo, long? branchNo,
@@ -344,7 +344,7 @@ public class RbacAuthorizationService : IRbacAuthorizationService
         var roleNos = await FindRoleNosForUserInBranchAsync(userNo, branchNo, cancellationToken);
         if (roleNos.Count == 0)
         {
-            return new PermSnapshot(true, false, false, false, false, false, 1, expiresAt);
+            return new PermSnapshot(true, false, false, false, false, false, 1, DataScopeConstants.Default, expiresAt);
         }
 
         var perm = await ResolveFormPermissionAsync(roleNos, companyNo, branchNo, formId,
@@ -352,13 +352,13 @@ public class RbacAuthorizationService : IRbacAuthorizationService
 
         if (perm == null || !AsBool(perm.CanView))
         {
-            return new PermSnapshot(true, false, false, false, false, false, 1, expiresAt);
+            return new PermSnapshot(true, false, false, false, false, false, 1, DataScopeConstants.Default, expiresAt);
         }
 
         var rf = perm.RecordFilter ?? 1;
 
         return new PermSnapshot(false, true, AsBool(perm.CanInsert), AsBool(perm.CanUpdate),
-                                AsBool(perm.CanDelete), AsBool(perm.CanApprove), rf, expiresAt);
+                                AsBool(perm.CanDelete), AsBool(perm.CanApprove), rf, DataScopeConstants.Normalize(perm.DataScope), expiresAt);
     }
 
     // =========================================================================
@@ -408,10 +408,23 @@ public class RbacAuthorizationService : IRbacAuthorizationService
                 AsBool(row.CanUpdate),
                 AsBool(row.CanDelete),
                 AsBool(row.CanApprove),
-                ownOnly);
+                ownOnly,
+                DataScopeConstants.Normalize(row.DataScope));
 
-            // Multiple menu rows can share a form id across submodules — OR the masks together.
-            bits[row.FormId] = bits.TryGetValue(row.FormId, out var existing) ? existing | mask : mask;
+            // Multiple menu rows can share a form id across submodules — OR the permission bits
+            // together. The scope field is NOT a flag set: OR-ing 2 bits would invent a scope
+            // (BRANCH|EMPLOYEE = EMPLOYEE), so it is merged separately, widest (lowest) wins —
+            // matching the MIN() the SQL uses to aggregate across roles.
+            if (bits.TryGetValue(row.FormId, out var existing))
+            {
+                var widest = Math.Min(PermissionBits.DataScopeOf(existing), PermissionBits.DataScopeOf(mask));
+                var merged = (existing | mask) & ~PermissionBits.ScopeMask;
+                bits[row.FormId] = merged | (widest << PermissionBits.ScopeShift);
+            }
+            else
+            {
+                bits[row.FormId] = mask;
+            }
         }
 
         return bits;
@@ -555,7 +568,8 @@ public class RbacAuthorizationService : IRbacAuthorizationService
                    MAX(COALESCE(rp.can_export, 0))    AS "CanExport",
                    0                                  AS "CanPrint",
                    MIN(COALESCE(rp.perm_scope, 2))    AS "PermScope",
-                   MIN(COALESCE(rp.record_filter, 1)) AS "RecordFilter"
+                   MIN(COALESCE(rp.record_filter, 1)) AS "RecordFilter",
+                   MIN(COALESCE(rp.data_scope, 1))    AS "DataScope"
             FROM   sys_role_permission rp
             JOIN   sys_role  r  ON r.role_no   = rp.role_no
                                 AND r.is_active = 1 AND r.is_deleted = 0
@@ -601,6 +615,7 @@ public class RbacAuthorizationService : IRbacAuthorizationService
                    0                                  AS "CanPrint",
                    MIN(COALESCE(rp.perm_scope, 2))    AS "PermScope",
                    MIN(COALESCE(rp.record_filter, 1)) AS "RecordFilter",
+                   MIN(COALESCE(rp.data_scope, 1))    AS "DataScope",
                    m.form_id                          AS "FormId",
                    LOWER(COALESCE(m.menu_type,'form')) AS "Type",
                    m.form_name                        AS "FormName",
@@ -689,4 +704,5 @@ public class ResolvedMenuPermission
     public int? CanPrint { get; set; }
     public int? PermScope { get; set; }
     public int? RecordFilter { get; set; }
+    public short? DataScope { get; set; }
 }

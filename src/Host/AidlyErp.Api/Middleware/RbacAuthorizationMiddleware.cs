@@ -45,7 +45,9 @@ public class RbacAuthorizationMiddleware
                                   IRbacAuthorizationService rbac,
                                   ISysDbContext db,
                                   ICompanyBranchContext tenant,
-                                  ICurrentPermissionContext permissionContext)
+                                  ICurrentPermissionContext permissionContext,
+                                  ICurrentUserScopeResolver userScope,
+                                  ILogger<RbacAuthorizationMiddleware> logger)
     {
         if (IsAuthOrPublicRequest(context.Request))
         {
@@ -94,7 +96,10 @@ public class RbacAuthorizationMiddleware
                 ? CurrentPermissionContext.RecordFilterOwn
                 : CurrentPermissionContext.RecordFilterAll;
 
-            permissionContext.Set(formId, recordFilter, userNo);
+            // data_scope rides in bits 6-7 of the same mask; a pre-feature token decodes to the
+            // widest scope, so those sessions keep their existing visibility until they re-login.
+            permissionContext.Set(formId, recordFilter, PermissionBits.DataScopeOf(mask), userNo);
+            await AttachOwnerIdentityAsync(permissionContext, userScope, logger, userNo, context.RequestAborted);
             await _next(context);
             return;
         }
@@ -108,8 +113,44 @@ public class RbacAuthorizationMiddleware
             return;
         }
 
-        permissionContext.Set(formId, access.RecordFilter, userNo);
+        permissionContext.Set(formId, access.RecordFilter, access.DataScope, userNo);
+        await AttachOwnerIdentityAsync(permissionContext, userScope, logger, userNo, context.RequestAborted);
         await _next(context);
+    }
+
+    /// <summary>
+    /// Resolves the caller's employee identity for the DEPARTMENT / EMPLOYEE scopes.
+    ///
+    /// <para>Skipped entirely for BRANCH scope, so the zero-DB fast path stays zero-DB whenever no
+    /// narrowing is configured. When a narrowing scope IS in force the lookup is cached per user,
+    /// so it costs one query per user per cache window rather than one per request.</para>
+    ///
+    /// <para><b>Never fatal.</b> This is optional enrichment: most endpoints — every lookup, every
+    /// unscoped list — do not consult the owner identity at all, so a failure here must not turn
+    /// their request into a 500. The connection pool is deliberately small (8), and this runs
+    /// BEFORE the controller takes its own connection, so a transient pool exhaustion surfaces
+    /// here first. On failure the identity is left unset, which is safe: a query that does apply a
+    /// narrowing scope then matches nothing rather than over-returning.</para>
+    /// </summary>
+    private static async Task AttachOwnerIdentityAsync(ICurrentPermissionContext permissionContext,
+                                                       ICurrentUserScopeResolver userScope,
+                                                       ILogger logger,
+                                                       long? userNo,
+                                                       CancellationToken cancellationToken)
+    {
+        if (permissionContext.DataScope == DataScopeConstants.Branch || userNo == null) return;
+
+        try
+        {
+            var identity = await userScope.ResolveAsync(userNo.Value, cancellationToken);
+            permissionContext.SetOwnerIdentity(identity.EmployeeNo, identity.DepartmentNo);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Could not resolve the employee identity for userNo={UserNo}; data-scoped queries on this request will return no rows.",
+                userNo);
+        }
     }
 
     private static async Task<string?> ResolveFormIdAsync(HttpRequest request, ISysDbContext db,
@@ -166,29 +207,36 @@ public class RbacAuthorizationMiddleware
                                                                          ISysDbContext db,
                                                                          CancellationToken cancellationToken)
     {
-        var rows = await db.Database.SqlQueryRaw<string?>(
-            """
-            SELECT m.form_id AS "Value"
-            FROM   sys_menu m
-            JOIN   sys_submodule s ON s.submodule_no = m.submodule_no
-                                  AND s.is_active   = 1
-                                  AND s.is_deleted  = 0
-            JOIN   sys_module    mo ON mo.module_no = s.module_no
-                                   AND mo.is_active = 1
-                                   AND mo.is_deleted= 0
-            WHERE  m.form_id IS NOT NULL
-              AND  m.route_path IS NOT NULL
-              AND  m.is_active = 1
-              AND  m.is_deleted = 0
-              AND  ( m.route_path = {0}
-                  OR m.route_path = {1}
-                  OR {0} LIKE CONCAT(m.route_path, '/%')
-                  OR {1} LIKE CONCAT(m.route_path, '/%') )
-            ORDER BY LENGTH(m.route_path) DESC
-            LIMIT 1
-            """, requestPath, withoutApiPrefix).ToListAsync(cancellationToken);
+        try
+        {
+            var rows = await db.Database.SqlQueryRaw<string?>(
+                """
+                SELECT m.form_id AS "Value"
+                FROM   sys_menu m
+                JOIN   sys_submodule s ON s.submodule_no = m.submodule_no
+                                      AND s.is_active   = 1
+                                      AND s.is_deleted  = 0
+                JOIN   sys_module    mo ON mo.module_no = s.module_no
+                                       AND mo.is_active = 1
+                                       AND mo.is_deleted= 0
+                WHERE  m.form_id IS NOT NULL
+                  AND  m.route_path IS NOT NULL
+                  AND  m.is_active = 1
+                  AND  m.is_deleted = 0
+                  AND  ( m.route_path = {0}
+                      OR m.route_path = {1}
+                      OR {0} LIKE CONCAT(m.route_path, '/%')
+                      OR {1} LIKE CONCAT(m.route_path, '/%') )
+                ORDER BY LENGTH(m.route_path) DESC
+                LIMIT 1
+                """, requestPath, withoutApiPrefix).ToListAsync(cancellationToken);
 
-        return rows.FirstOrDefault();
+            return rows.FirstOrDefault();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Invalidate the URL→form cache — call after menu route paths change (rare).</summary>

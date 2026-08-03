@@ -47,4 +47,12 @@ public class RolePermission : AuditEntity
 
     [Column("record_filter")]
     public short RecordFilter { get; set; } = 1;
+
+    /// <summary>
+    /// Row-level data scope: 1 = BRANCH, 2 = DEPARTMENT, 3 = EMPLOYEE.
+    /// Defaults to BRANCH — no narrowing beyond the tenant filter — so a grant created
+    /// without an explicit scope behaves as it did before row-level security existed.
+    /// </summary>
+    [Column("data_scope")]
+    public short DataScope { get; set; } = 1;
 }

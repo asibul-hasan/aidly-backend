@@ -39,6 +39,10 @@ public class Sys1108StepDto
     [JsonPropertyName("is_active")]
     public short? IsActive { get; set; } = 1;
 
+    /// <summary>How many approvers hang off this step — see <c>Sys1108ScopeDto.StepCount</c>.</summary>
+    [JsonPropertyName("approver_count")]
+    public long? ApproverCount { get; set; }
+
     [JsonPropertyName("approvers")]
     public List<Sys1108ApproverDto> Approvers { get; set; } = new();
 }
@@ -69,6 +73,13 @@ public class Sys1108ScopeDto
 
     [JsonPropertyName("row_version")]
     public long? RowVersion { get; set; }
+
+    /// <summary>
+    /// How many steps hang off this workflow. Lets the list hide a workflow's delete button
+    /// while it still has children, without fetching those children.
+    /// </summary>
+    [JsonPropertyName("step_count")]
+    public long? StepCount { get; set; }
 
     [JsonPropertyName("steps")]
     public List<Sys1108StepDto> Steps { get; set; } = new();

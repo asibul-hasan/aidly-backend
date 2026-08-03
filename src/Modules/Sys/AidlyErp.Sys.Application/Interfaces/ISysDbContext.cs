@@ -41,6 +41,8 @@ public interface ISysDbContext
     DbSet<UserCompany> UserCompanies { get; }
     DbSet<UserWarehouse> UserWarehouses { get; }
     DbSet<Department> Departments { get; }
+    DbSet<SysNotification> Notifications { get; }
+    DbSet<SysNotificationTemplate> NotificationTemplates { get; }
 
     DbSet<AidlyErp.Shared.Core.EventOutbox> EventOutboxes { get; }
 

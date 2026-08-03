@@ -1,15 +1,17 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using AidlyErp.Shared.Core;
+using AidlyErp.Shared.Core.Security;
 
 namespace AidlyErp.Hrm.Domain;
 
 [Table("hrm_employee")]
-public class HrmEmployee : AuditEntity, IBranchScopedEntity
+public class HrmEmployee : AuditEntity, IBranchScopedEntity, IEmployeeOwnedEntity, IDepartmentScopedEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     [Column("employee_no")]
+    [System.Text.Json.Serialization.JsonConverter(typeof(AidlyErp.Shared.Core.Utils.SafeLongJsonConverter))]
     public long EmployeeNo { get; set; }
 
     [Column("employee_id")]
@@ -75,6 +77,11 @@ public class HrmEmployee : AuditEntity, IBranchScopedEntity
 
     [Column("department_no")]
     public long DepartmentNo { get; set; }
+
+    /// <summary>Markers for the EMPLOYEE / DEPARTMENT data scopes; the filters bind the concrete columns.</summary>
+    long? IEmployeeOwnedEntity.EmployeeNo => EmployeeNo;
+
+    long? IDepartmentScopedEntity.DepartmentNo => DepartmentNo;
 
     [Column("designation_no")]
     public long DesignationNo { get; set; }

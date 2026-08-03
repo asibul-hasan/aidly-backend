@@ -29,13 +29,19 @@ public class Hrm1101Service : IHrm1101Service
 {
     private readonly IHrmDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly ICurrentPermissionContext _perm;
     private const short SrcManual = 1;
 
-    public Hrm1101Service(IHrmDbContext db, ICompanyBranchContext ctx) { _db = db; _ctx = ctx; }
+    public Hrm1101Service(IHrmDbContext db, ICompanyBranchContext ctx, ICurrentPermissionContext perm)
+    {
+        _db = db;
+        _ctx = ctx;
+        _perm = perm;
+    }
 
     public async Task<List<HrmAttendance>> GetListAsync(long? branchNo, DateTime? fromDate, DateTime? toDate, CancellationToken ct = default)
     {
-        var query = _db.HrmAttendances.AsNoTracking().Where(x => x.IsDeleted == 0);
+        var query = _db.HrmAttendances.AsNoTracking().Where(x => x.IsDeleted == 0).ApplyDataScope(_perm);
         if (branchNo.HasValue) query = query.Where(x => x.BranchNo == branchNo.Value);
         if (fromDate.HasValue) query = query.Where(x => x.AttDate >= fromDate.Value);
         if (toDate.HasValue) query = query.Where(x => x.AttDate <= toDate.Value);
@@ -43,7 +49,9 @@ public class Hrm1101Service : IHrm1101Service
     }
 
     public async Task<List<HrmAttendance>> GetListByEmployeeAsync(long employeeNo, CancellationToken ct = default) =>
-        await _db.HrmAttendances.AsNoTracking().Where(x => x.EmployeeNo == employeeNo && x.IsDeleted == 0).OrderByDescending(x => x.AttDate).ToListAsync(ct);
+        await _db.HrmAttendances.AsNoTracking().Where(x => x.EmployeeNo == employeeNo && x.IsDeleted == 0)
+            .ApplyDataScope(_perm)
+            .OrderByDescending(x => x.AttDate).ToListAsync(ct);
 
     public async Task<HrmAttendance> GetDetailAsync(long attendanceNo, CancellationToken ct = default) =>
         await LoadLiveAsync(attendanceNo, ct);

@@ -34,12 +34,14 @@ public class ApprovalService : IApprovalService
     private readonly ICompanyBranchContext _ctx;
     private readonly ICurrentPermissionContext _permissionContext;
     private readonly IEnumerable<IApprovalCompletedListener> _listeners;
+    private readonly INotificationDispatcher? _notificationDispatcher;
     private readonly ILogger<ApprovalService> _logger;
 
     public ApprovalService(ISysDbContext db, IUnitOfWork<ISysDbContext> unitOfWork, ICompanyBranchContext ctx,
                            ICurrentPermissionContext permissionContext,
                            IEnumerable<IApprovalCompletedListener> listeners,
-                           ILogger<ApprovalService> logger)
+                           ILogger<ApprovalService> logger,
+                           INotificationDispatcher? notificationDispatcher = null)
     {
         _db = db;
         _unitOfWork = unitOfWork;
@@ -47,6 +49,7 @@ public class ApprovalService : IApprovalService
         _permissionContext = permissionContext;
         _listeners = listeners;
         _logger = logger;
+        _notificationDispatcher = notificationDispatcher;
     }
 
     // ─── Raise ───────────────────────────────────────────────────────────────
@@ -221,6 +224,14 @@ public class ApprovalService : IApprovalService
 
             await _db.SaveChangesAsync(ct);
 
+            // Tell the first step's approvers there is something waiting. Staged in THIS
+            // transaction, so an approval request and its notifications commit together.
+            await NotifyStepApproversAsync(req, req.CurrentStep, menuNo,
+                NotificationEvents.ApprovalRequested,
+                "Approval required",
+                $"{await DescribeAsync(req, ct)} is awaiting your approval.",
+                ct);
+
             _logger.LogInformation("Approval raised: requestNo={RequestNo}, documentType={DocumentType}, pk={Pk}, steps={Steps}",
                 req.ApprovalRequestNo, documentType, documentPk, steps.Count);
 
@@ -314,6 +325,13 @@ public class ApprovalService : IApprovalService
 
             req.CurrentStep = target.Value;
             await _db.SaveChangesAsync(ct);
+
+            // The queue moved on — the next step's approvers are the ones who now need to act.
+            await NotifyStepApproversAsync(req, req.CurrentStep, null,
+                NotificationEvents.ApprovalStepAdvanced,
+                "Approval required",
+                $"{await DescribeAsync(req, ct)} has advanced to your approval step.",
+                ct);
 
             _logger.LogInformation("Approval routed: requestNo={RequestNo}, from step={From} type={Type} -> step={To}",
                 approvalRequestNo, step.StepNumber, stepType, target);
@@ -493,6 +511,9 @@ public class ApprovalService : IApprovalService
         _logger.LogInformation("Approval {Outcome}: requestNo={RequestNo}, documentType={DocumentType}, pk={Pk}",
             approved ? "APPROVED" : "REJECTED", req.ApprovalRequestNo, req.DocumentType, req.DocumentPk);
 
+        // The chain is settled — tell the person who raised it how it ended.
+        await NotifyRequesterAsync(req, approved, ct);
+
         // Spring publishes ApprovalCompletedEvent here; the .NET equivalent notifies every
         // registered listener so the owning module can apply the outcome to its document.
         if (req.DocumentType == null || req.DocumentPk == null) return;
@@ -502,6 +523,144 @@ public class ApprovalService : IApprovalService
             await listener.OnApprovalCompletedAsync(req.DocumentType, req.DocumentPk.Value, approved, ct);
         }
     }
+
+    // ── Notifications ─────────────────────────────────────────────────────────
+    //
+    // Dispatch lives in the engine rather than in each document service. The engine is the only
+    // place that knows who the current approvers are, so putting it here means every
+    // approval-gated document — leave, payroll, PO, stock adjustment — gets the same
+    // notifications for free, and a new module cannot forget to send them.
+
+    /// <summary>
+    /// Notifies the approvers sitting on <paramref name="stepNumber"/>.
+    ///
+    /// <para>Approvers are recorded as employees, while notifications address users, so the
+    /// employee numbers are mapped to logins in ONE batched query — never one lookup per approver.
+    /// An approver with no user account is skipped: there is no inbox to deliver to.</para>
+    /// </summary>
+    private async Task NotifyStepApproversAsync(ApprovalRequest req, short stepNumber, long? menuNo,
+                                                string triggerEvent, string title, string message,
+                                                CancellationToken ct)
+    {
+        if (_notificationDispatcher == null) return;
+
+        var employeeNos = await _db.ApprovalRequestSteps
+            .AsNoTracking()
+            .Where(s => s.ApprovalRequestNo == req.ApprovalRequestNo && s.StepNumber == stepNumber && s.EmpNo != null)
+            .Select(s => s.EmpNo!.Value)
+            .Distinct()
+            .ToListAsync(ct);
+
+        if (employeeNos.Count == 0) return;
+
+        var recipients = await _db.Users
+            .AsNoTracking()
+            .Where(u => employeeNos.Contains(u.EmployeeNo) && u.IsDeleted == Deleted && u.IsActive == 1)
+            .Select(u => new { u.UserNo, u.EmployeeNo })
+            .ToListAsync(ct);
+
+        if (recipients.Count == 0)
+        {
+            _logger.LogWarning(
+                "Approval requestNo={RequestNo} step={Step} has {Count} approver employee(s) but none has an active user account — nobody can be notified.",
+                req.ApprovalRequestNo, stepNumber, employeeNos.Count);
+            return;
+        }
+
+        var senderUserNo = _ctx.UserNo;
+
+        await _notificationDispatcher.DispatchManyAsync(recipients.Select(r => new NotificationDispatchPayload(
+            CompanyNo: req.CompanyNo,
+            BranchNo: req.BranchNo,
+            TargetUserNo: r.UserNo,
+            TargetEmployeeNo: r.EmployeeNo,
+            SenderUserNo: senderUserNo,
+            MenuNo: menuNo,
+            FormId: _permissionContext.FormId,
+            DocumentType: req.DocumentType,
+            DocumentPk: req.DocumentPk,
+            ApprovalRequestNo: req.ApprovalRequestNo,
+            Title: title,
+            Message: message,
+            PayloadData: new
+            {
+                trigger_event = triggerEvent,
+                step_number = stepNumber,
+                document_no = req.DocumentNo
+            }
+        )), ct);
+    }
+
+    /// <summary>Tells whoever raised the request how it was decided.</summary>
+    private async Task NotifyRequesterAsync(ApprovalRequest req, bool approved, CancellationToken ct)
+    {
+        if (_notificationDispatcher == null || req.RequestedBy == 0) return;
+
+        // Don't notify someone about their own action — a self-approver already knows.
+        if (req.RequestedBy == _ctx.UserNo) return;
+
+        var outcome = approved ? "approved" : "rejected";
+
+        await _notificationDispatcher.DispatchAsync(new NotificationDispatchPayload(
+            CompanyNo: req.CompanyNo,
+            BranchNo: req.BranchNo,
+            TargetUserNo: req.RequestedBy,
+            TargetEmployeeNo: null,
+            SenderUserNo: _ctx.UserNo,
+            MenuNo: null,
+            FormId: _permissionContext.FormId,
+            DocumentType: req.DocumentType,
+            DocumentPk: req.DocumentPk,
+            ApprovalRequestNo: req.ApprovalRequestNo,
+            Title: approved ? "Approved" : "Rejected",
+            Message: $"{await DescribeAsync(req, ct)} was {outcome}.",
+            PayloadData: new
+            {
+                trigger_event = approved ? NotificationEvents.ApprovalApproved : NotificationEvents.ApprovalRejected,
+                document_no = req.DocumentNo
+            }
+        ), ct);
+    }
+
+    /// <summary>
+    /// Human-readable handle for a request, e.g. "Leave Application LV-16".
+    ///
+    /// <para><b>Never shows the document type code.</b> "HRM_1301" is an internal form id; the
+    /// person reading the notification has no idea what it means. The form NAME comes from
+    /// <c>sys_menu</c>, so it is whatever the menu calls the form — and it stays correct if the
+    /// form is renamed.</para>
+    /// </summary>
+    private async Task<string> DescribeAsync(ApprovalRequest req, CancellationToken ct)
+    {
+        var formName = await ResolveFormNameAsync(req.DocumentType, ct);
+
+        if (string.IsNullOrWhiteSpace(req.DocumentNo))
+            return string.IsNullOrWhiteSpace(formName) ? $"#{req.DocumentPk}" : $"{formName} #{req.DocumentPk}";
+
+        return string.IsNullOrWhiteSpace(formName) ? req.DocumentNo : $"{formName} {req.DocumentNo}";
+    }
+
+    /// <summary>
+    /// Form id → form name, memoized for the lifetime of the request. Returns null when the type
+    /// maps to no menu, so the caller degrades to the document number alone rather than printing
+    /// a code at the user.
+    /// </summary>
+    private async Task<string?> ResolveFormNameAsync(string? formId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(formId)) return null;
+        if (_formNameCache.TryGetValue(formId, out var cached)) return cached;
+
+        var name = await _db.Menus
+            .AsNoTracking()
+            .Where(m => m.FormId == formId && m.IsDeleted == Deleted)
+            .Select(m => m.FormName)
+            .FirstOrDefaultAsync(ct);
+
+        _formNameCache[formId] = name;
+        return name;
+    }
+
+    private readonly Dictionary<string, string?> _formNameCache = [];
 
     private async Task<ApprovalStep?> CurrentStepConfigAsync(ApprovalRequest req, CancellationToken ct)
     {

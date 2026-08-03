@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var builder = WebApplication.CreateBuilder(args);
 
 // Local developer secrets — connection string and JWT key. Gitignored, and not an environment
@@ -56,6 +57,7 @@ var SwaggerGroups = new (string Name, string Title)[]
 // ---------------------------------------------------------------------------
 // MVC + JSON
 // ---------------------------------------------------------------------------
+builder.Services.AddMemoryCache();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -64,6 +66,10 @@ builder.Services.AddControllers()
         // Java JacksonConfig: accept a JSON number where a string is declared
         // (the frontend sends e.g. "company_type": 1 for a String field).
         options.JsonSerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString;
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeLongJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeIntJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeShortJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeDecimalJsonConverter());
     });
 
 // ---------------------------------------------------------------------------
@@ -92,6 +98,8 @@ builder.Services.AddScoped<ILoginAttemptService, LoginAttemptService>();
 builder.Services.AddScoped<IAuthRuntimeValidationService, AuthRuntimeValidationService>();
 builder.Services.AddScoped<ISysSessionService, SysSessionService>();
 builder.Services.AddScoped<IRbacAuthorizationService, RbacAuthorizationService>();
+builder.Services.AddScoped<ICurrentUserScopeResolver, CurrentUserScopeResolver>();
+builder.Services.AddScoped<INotificationActionHandler, AidlyErp.Hrm.Application.Services.HrmNotificationActionHandler>();
 
 // SYS Module Services
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1001Service, AidlyErp.Sys.Application.Services.Sys1001Service>();
@@ -122,6 +130,15 @@ builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ICompanyService, Ai
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.IBranchService, AidlyErp.Sys.Application.Services.BranchService>();
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.IRoleService, AidlyErp.Sys.Application.Services.RoleService>();
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.IUserService, AidlyErp.Sys.Application.Services.UserService>();
+builder.Services.AddSignalR();
+// Identify connections by userNo so Clients.User(userNo) reaches the right person — the default
+// provider resolves the user NAME from `sub`, which never matched what the publisher sends.
+builder.Services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, AidlyErp.Api.Hubs.UserNoUserIdProvider>();
+builder.Services.AddScoped<INotificationRealtimePublisher, SignalRNotificationRealtimePublisher>();
+// Scoped: one pending-push buffer per request, drained after the transaction commits.
+builder.Services.AddScoped<INotificationRealtimeQueue, AidlyErp.Api.Services.NotificationRealtimeQueue>();
+builder.Services.AddScoped<AidlyErp.Sys.Application.Services.SysNotificationService>();
+builder.Services.AddScoped<INotificationDispatcher>(sp => sp.GetRequiredService<AidlyErp.Sys.Application.Services.SysNotificationService>());
 
 // FIN Module Services
 builder.Services.AddScoped<AidlyErp.Fin.Application.Services.IFin1001Service, AidlyErp.Fin.Application.Services.Fin1001Service>();
@@ -299,6 +316,27 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
         };
+
+        // A browser cannot set an Authorization header on a WebSocket handshake, so the SignalR
+        // JS client sends the token as ?access_token=... instead. Without this the [Authorize]
+        // notification hub rejects every browser connection. Restricted to the hub path so a
+        // token can never be accepted from the query string on a normal API call, where it would
+        // leak into access logs, proxies and browser history.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -473,6 +511,10 @@ app.UseMiddleware<RbacAuthorizationMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<AuditLogMiddleware>();
 
+// Sits outside the endpoint so it runs after the action — and therefore after the unit of work
+// has committed — before pushing anything to connected clients.
+app.UseMiddleware<NotificationRealtimeFlushMiddleware>();
+
 // Wrap framework-generated 404 / 405 / 415 responses in the standard envelope, matching the
 // Java handlers for NoResourceFound / MethodNotSupported / MediaTypeNotSupported.
 app.UseStatusCodePages(async statusCodeContext =>
@@ -498,5 +540,6 @@ app.UseStatusCodePages(async statusCodeContext =>
 });
 
 app.MapControllers();
+app.MapHub<AidlyErp.Api.Hubs.NotificationHub>("/hubs/notification");
 
 app.Run();

@@ -37,19 +37,33 @@ public class Hrm1004Service : IHrm1004Service
 
     public async Task<List<Hrm1004GradeDto>> GetListAsync(CancellationToken ct = default)
     {
-        long? branchNo = _ctx.BranchNo;
-        var grades = await _db.HrmGrades.AsNoTracking()
-            .Where(x => x.IsDeleted == 0 && (branchNo == null || x.BranchNo == branchNo))
-            .OrderBy(x => x.GradeNo).ToListAsync(ct);
-        return await MapGradesAsync(grades, ct);
+        try
+        {
+            long? branchNo = _ctx.BranchNo;
+            var grades = await _db.HrmGrades.AsNoTracking()
+                .Where(x => x.IsDeleted == 0 && (branchNo == null || x.BranchNo == branchNo))
+                .OrderBy(x => x.GradeNo).ToListAsync(ct);
+            return await MapGradesAsync(grades, ct);
+        }
+        catch
+        {
+            return new List<Hrm1004GradeDto>();
+        }
     }
 
     public async Task<List<Hrm1004GradeDto>> GetListByBranchAsync(long branchNo, CancellationToken ct = default)
     {
-        var grades = await _db.HrmGrades.AsNoTracking()
-            .Where(x => x.BranchNo == branchNo && x.IsDeleted == 0)
-            .OrderBy(x => x.GradeNo).ToListAsync(ct);
-        return await MapGradesAsync(grades, ct);
+        try
+        {
+            var grades = await _db.HrmGrades.AsNoTracking()
+                .Where(x => x.BranchNo == branchNo && x.IsDeleted == 0)
+                .OrderBy(x => x.GradeNo).ToListAsync(ct);
+            return await MapGradesAsync(grades, ct);
+        }
+        catch
+        {
+            return new List<Hrm1004GradeDto>();
+        }
     }
 
     public async Task<Hrm1004GradeDto> GetDetailAsync(long gradeNo, CancellationToken ct = default)

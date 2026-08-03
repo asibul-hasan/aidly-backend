@@ -4,6 +4,7 @@ using AidlyErp.Shared.Core.Abstractions;
 using AidlyErp.Shared.Contracts;
 using AidlyErp.Sys.Contracts;
 using AidlyErp.Hrm.Application.Interfaces;
+using AidlyErp.Shared.Core.Security;
 using AidlyErp.Hrm.Application.Dto;
 
 namespace AidlyErp.Hrm.Application.Services;
@@ -23,7 +24,13 @@ public interface IHrm1203Service
 public class Hrm1203Service : IHrm1203Service
 {
     private readonly IHrmDbContext _db;
-    public Hrm1203Service(IHrmDbContext db) => _db = db;
+    private readonly ICurrentPermissionContext _perm;
+
+    public Hrm1203Service(IHrmDbContext db, ICurrentPermissionContext perm)
+    {
+        _db = db;
+        _perm = perm;
+    }
 
     public async Task<List<Hrm1203RunLiteDto>> GetRunsAsync(CancellationToken ct = default) =>
         await _db.HrmPayrollRuns.AsNoTracking()
@@ -48,6 +55,7 @@ public class Hrm1203Service : IHrm1203Service
 
         return await _db.HrmPayslips.AsNoTracking()
             .Where(p => p.PayrollRunNo == run.PayrollRunNo && p.IsDeleted == 0)
+            .ApplyDataScope(_perm)
             .OrderBy(p => p.PayslipNo)
             .Select(s => new Hrm1203SheetRowDto
             {

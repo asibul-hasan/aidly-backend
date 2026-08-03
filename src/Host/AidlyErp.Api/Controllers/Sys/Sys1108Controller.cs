@@ -22,9 +22,19 @@ public class Sys1108Controller : ApiControllerBase
 
     public Sys1108Controller(ISys1108Service service) => _service = service;
 
+    /// <summary>Workflow list. Any filter left out means "all" for that column.</summary>
     [HttpGet("workflows")]
-    public async Task<IActionResult> GetList(CancellationToken cancellationToken) =>
-        OkResponse(await _service.GetListAsync(cancellationToken));
+    public async Task<IActionResult> GetList([FromQuery] long? branch_no, [FromQuery] long? department_no,
+                                             [FromQuery] long? menu_no, CancellationToken cancellationToken) =>
+        OkResponse(await _service.GetListAsync(branch_no, department_no, menu_no, cancellationToken));
+
+    [HttpGet("workflows/{scopeNo:long}/steps")]
+    public async Task<IActionResult> GetSteps(long scopeNo, CancellationToken cancellationToken) =>
+        OkResponse(await _service.GetStepsAsync(scopeNo, cancellationToken));
+
+    [HttpGet("steps/{stepNo:long}/approvers")]
+    public async Task<IActionResult> GetApprovers(long stepNo, CancellationToken cancellationToken) =>
+        OkResponse(await _service.GetApproversAsync(stepNo, cancellationToken));
 
     [HttpGet("menus")]
     public async Task<IActionResult> GetEnrolledMenus(CancellationToken cancellationToken) =>

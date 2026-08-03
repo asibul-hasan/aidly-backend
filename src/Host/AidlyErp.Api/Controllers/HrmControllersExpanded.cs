@@ -540,43 +540,49 @@ public class Hrm1301Controller : ApiControllerBase
     private readonly IHrm1301Service _service;
     public Hrm1301Controller(IHrm1301Service service) => _service = service;
 
-    [HttpGet("leave-applications")]
+    [HttpGet("leaves")]
     public async Task<IActionResult> GetList() => OkResponse(await _service.GetListAsync());
 
-    [HttpGet("leave-applications/employee/{employeeNo:long}")]
+    [HttpGet("leaves/employee/{employeeNo:long}")]
     public async Task<IActionResult> GetByEmployee(long employeeNo) => OkResponse(await _service.GetListByEmployeeAsync(employeeNo));
 
-    [HttpGet("leave-applications/history/{employeeNo:long}")]
-    public async Task<IActionResult> GetFilteredHistory(long employeeNo, [FromQuery] long? leaveTypeNo, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate) =>
+    [HttpGet("leaves/filtered")]
+    public async Task<IActionResult> GetFilteredHistory([FromQuery] long employeeNo, [FromQuery] long? leaveTypeNo, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate) =>
         OkResponse(await _service.GetFilteredHistoryAsync(employeeNo, leaveTypeNo, fromDate, toDate));
 
-    [HttpGet("leave-applications/{no:long}")]
+    [HttpGet("leaves/{no:long}")]
     public async Task<IActionResult> GetDetail(long no) => OkResponse(await _service.GetDetailAsync(no));
 
-    [HttpGet("leave-applications/approval-list")]
+    [HttpGet("leaves/status")]
     public async Task<IActionResult> GetApprovalList([FromQuery] long? branchNo) => OkResponse(await _service.GetApprovalListAsync(branchNo));
 
-    [HttpGet("leave-applications/balance/{employeeNo:long}")]
-    public async Task<IActionResult> GetBalance(long employeeNo, [FromQuery] int? leaveYear) => OkResponse(await _service.GetBalanceAsync(employeeNo, leaveYear));
+    [HttpGet("balance")]
+    public async Task<IActionResult> GetBalance([FromQuery] long employeeNo, [FromQuery] int? leaveYear) => OkResponse(await _service.GetBalanceAsync(employeeNo, leaveYear));
 
-    [HttpPost("leave-applications")]
+    [HttpPost("leaves")]
     public async Task<IActionResult> Save([FromBody] Hrm1301LeaveApplicationDto dto) => OkResponse(await _service.SaveAsync(dto), dto.LeaveApplicationNo.HasValue ? "Leave updated" : "Leave created");
 
-    [HttpPost("leave-applications/{no:long}/submit")]
+    [HttpPost("leaves/{no:long}/submit")]
     public async Task<IActionResult> Submit(long no) => OkResponse(await _service.SubmitAsync(no), "Leave submitted");
 
-    [HttpPost("leave-applications/{no:long}/approve")]
+    [HttpPost("leaves/{no:long}/approve")]
     public async Task<IActionResult> Approve(long no, [FromQuery] string? remarks) => OkResponse(await _service.ApproveAsync(no, remarks), "Leave approved");
 
-    [HttpPost("leave-applications/{no:long}/reject")]
+    [HttpPost("leaves/{no:long}/reject")]
     public async Task<IActionResult> Reject(long no, [FromQuery] string? reason) => OkResponse(await _service.RejectAsync(no, reason), "Leave rejected");
 
-    [HttpPost("leave-applications/{no:long}/cancel")]
+    [HttpPost("leaves/{no:long}/cancel")]
     public async Task<IActionResult> Cancel(long no) => OkResponse(await _service.CancelAsync(no), "Leave cancelled");
 
-    [HttpDelete("leave-applications/{no:long}")]
+    [HttpPut("leaves/{no:long}/reliever-status")]
+    public async Task<IActionResult> UpdateRelieverStatus(long no, [FromBody] RelieverStatusRequest request) =>
+        OkResponse(await _service.UpdateRelieverStatusAsync(no, request.Status, request.Remarks), "Reliever status updated");
+
+    [HttpDelete("leaves/{no:long}")]
     public async Task<IActionResult> Delete(long no) { await _service.DeleteAsync(no); return OkResponse<object?>(null, "Leave deleted"); }
 }
+
+public record RelieverStatusRequest(short Status, string? Remarks);
 
 [Route("api/hrm/1303")]
 [Route("api/v1/hrm/forms/hrm1303")]
@@ -585,7 +591,7 @@ public class Hrm1303Controller : ApiControllerBase
     private readonly IHrm1303Service _service;
     public Hrm1303Controller(IHrm1303Service service) => _service = service;
 
-    [HttpGet("leave-balances")]
+    [HttpGet("balances")]
     public async Task<IActionResult> GetBalances([FromQuery] long employeeNo) => OkResponse(await _service.GetBalancesAsync(employeeNo));
 }
 
@@ -781,3 +787,5 @@ public class HrmEmployeeController : ApiControllerBase
     [HttpDelete("{no:long}")]
     public async Task<IActionResult> Delete(long no) { await _service.DeleteAsync(no); return OkResponse<object?>(null, "Employee deleted"); }
 }
+
+

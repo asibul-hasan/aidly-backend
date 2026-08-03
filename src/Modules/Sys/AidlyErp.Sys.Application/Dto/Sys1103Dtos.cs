@@ -80,4 +80,12 @@ public class Sys1103PermissionRowDto
     /// <summary>1 = ALL (the default), 2 = OWN records only.</summary>
     [JsonPropertyName("record_filter")]
     public short? RecordFilter { get; set; }
+
+    /// <summary>
+    /// Row-level data scope: 1 = BRANCH (the default — no narrowing beyond the tenant filter),
+    /// 2 = DEPARTMENT (the caller's department), 3 = EMPLOYEE (the caller's own records).
+    /// See <see cref="AidlyErp.Shared.Core.Security.DataScopeConstants"/>.
+    /// </summary>
+    [JsonPropertyName("data_scope")]
+    public short? DataScope { get; set; }
 }

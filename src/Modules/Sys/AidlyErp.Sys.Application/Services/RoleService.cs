@@ -48,18 +48,15 @@ public class RoleService : IRoleService
     public Task<RoleDto> InsertAsync(RoleDto dto, CancellationToken cancellationToken = default) =>
         _unitOfWork.ExecuteAsync(async ct =>
         {
-            if (dto.CompanyNo == null)
-            {
-                throw new ValidationException("company_no is required to create a role");
-            }
+            var companyNo = Company();
 
-            if (await _db.Roles.AnyAsync(r => r.CompanyNo == dto.CompanyNo && r.RoleId == dto.RoleId
+            if (await _db.Roles.AnyAsync(r => r.CompanyNo == companyNo && r.RoleId == dto.RoleId
                                               && r.IsDeleted == Deleted, ct))
             {
                 throw new ValidationException("Role ID already exists in this company: " + dto.RoleId);
             }
 
-            var entity = new Role { CompanyNo = dto.CompanyNo };
+            var entity = new Role { CompanyNo = companyNo };
             Apply(dto, entity);
 
             _db.Roles.Add(entity);
@@ -233,7 +230,6 @@ public class RoleService : IRoleService
 
     private static void Apply(RoleDto dto, Role e)
     {
-        if (dto.CompanyNo != null) e.CompanyNo = dto.CompanyNo;
         if (dto.RoleId != null) e.RoleId = dto.RoleId;
         if (dto.RoleName != null) e.RoleName = dto.RoleName;
         if (dto.RoleDesc != null) e.RoleDesc = dto.RoleDesc;

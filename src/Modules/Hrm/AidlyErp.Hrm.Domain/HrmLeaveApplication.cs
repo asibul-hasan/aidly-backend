@@ -1,11 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using AidlyErp.Shared.Core;
+using AidlyErp.Shared.Core.Security;
 
 namespace AidlyErp.Hrm.Domain;
 
 [Table("hrm_leave_application")]
-public class HrmLeaveApplication : AuditEntity, IBranchScopedEntity
+public class HrmLeaveApplication : AuditEntity, IBranchScopedEntity, IEmployeeOwnedEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -18,6 +19,9 @@ public class HrmLeaveApplication : AuditEntity, IBranchScopedEntity
 
     [Column("employee_no")]
     public long EmployeeNo { get; set; }
+
+    /// <summary>Marker for the EMPLOYEE data scope; the filter binds the concrete column above.</summary>
+    long? IEmployeeOwnedEntity.EmployeeNo => EmployeeNo;
 
     [Column("leave_type_no")]
     public long LeaveTypeNo { get; set; }
@@ -62,6 +66,17 @@ public class HrmLeaveApplication : AuditEntity, IBranchScopedEntity
 
     [Column("reliever_employee_no")]
     public long? RelieverEmployeeNo { get; set; }
+
+    /// <summary>0 = Pending, 1 = Rejected, 2 = Accepted</summary>
+    [Column("reliever_status")]
+    public short RelieverStatus { get; set; } = 0;
+
+    [Column("reliever_action_at")]
+    public DateTime? RelieverActionAt { get; set; }
+
+    [Column("reliever_remarks")]
+    [StringLength(250)]
+    public string? RelieverRemarks { get; set; }
 
     [Column("attachment_path")]
     [StringLength(500)]
