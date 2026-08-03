@@ -269,7 +269,7 @@ builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPur1105Service, Ai
 builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPur1106Service, AidlyErp.Pur.Application.Services.Pur1106Service>();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Host=localhost;Database=aidly_sme;Username=postgres;Password=postgres";
+    ?? "Host=aidlydbpg-aidlly23-infoaidtech.a.aivencloud.com;Port=12656;Database=defaultdb;Username=avnadmin;Password=AVNS_DxFVsIyjx9okN5LVt2h;SslMode=Require;Trust Server Certificate=true;";
 
 var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD")
               ?? Environment.GetEnvironmentVariable("Aidly__Db__Password");
