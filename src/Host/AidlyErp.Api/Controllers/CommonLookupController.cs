@@ -87,7 +87,7 @@ public class CommonLookupController : ApiControllerBase, IActionFilter
             
             if (!string.IsNullOrEmpty(seq))
             {
-                await _hrm.Database.ExecuteSqlRawAsync($"SELECT setval('{seq}', {max})");
+                await _hrm.Database.ExecuteSqlRawAsync("SELECT setval({0}, {1})", seq, max);
             }
             return OkResponse(new { message = $"HRM sequences synced. Sequence: {seq}, Max: {max}" });
         }

@@ -60,8 +60,11 @@ RUN dotnet publish "AidlyErp.Api.csproj" -c Release -o /app/publish /p:UseAppHos
 FROM base AS final
 WORKDIR /app
 
-# Copy published application binaries
-COPY --from=build /app/publish .
+# Copy published application binaries with non-root ownership
+COPY --from=build --chown=$APP_UID:$APP_UID /app/publish .
+
+# Pre-create uploads directory and assign ownership to non-root user
+RUN mkdir -p /app/uploads && chown -R $APP_UID /app
 
 # Set non-root container user
 USER $APP_UID
