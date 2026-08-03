@@ -1,9 +1,50 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/AidlyErp.Api/AidlyErp.Api.csproj" />
-    <Project Path="src/AidlyErp.Application/AidlyErp.Application.csproj" />
-    <Project Path="src/AidlyErp.Domain/AidlyErp.Domain.csproj" />
-    <Project Path="src/AidlyErp.Infrastructure/AidlyErp.Infrastructure.csproj" />
+  <Folder Name="/src/Host/">
+    <Project Path="src/Host/AidlyErp.Api/AidlyErp.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/AidlyErp.Shared.Core/AidlyErp.Shared.Core.csproj" />
+    <Project Path="src/Shared/AidlyErp.Shared.Contracts/AidlyErp.Shared.Contracts.csproj" />
+    <Project Path="src/Shared/AidlyErp.Shared.Infrastructure/AidlyErp.Shared.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Sys/">
+    <Project Path="src/Modules/Sys/AidlyErp.Sys.Domain/AidlyErp.Sys.Domain.csproj" />
+    <Project Path="src/Modules/Sys/AidlyErp.Sys.Contracts/AidlyErp.Sys.Contracts.csproj" />
+    <Project Path="src/Modules/Sys/AidlyErp.Sys.Application/AidlyErp.Sys.Application.csproj" />
+    <Project Path="src/Modules/Sys/AidlyErp.Sys.Infrastructure/AidlyErp.Sys.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Hrm/">
+    <Project Path="src/Modules/Hrm/AidlyErp.Hrm.Domain/AidlyErp.Hrm.Domain.csproj" />
+    <Project Path="src/Modules/Hrm/AidlyErp.Hrm.Contracts/AidlyErp.Hrm.Contracts.csproj" />
+    <Project Path="src/Modules/Hrm/AidlyErp.Hrm.Application/AidlyErp.Hrm.Application.csproj" />
+    <Project Path="src/Modules/Hrm/AidlyErp.Hrm.Infrastructure/AidlyErp.Hrm.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Fin/">
+    <Project Path="src/Modules/Fin/AidlyErp.Fin.Domain/AidlyErp.Fin.Domain.csproj" />
+    <Project Path="src/Modules/Fin/AidlyErp.Fin.Contracts/AidlyErp.Fin.Contracts.csproj" />
+    <Project Path="src/Modules/Fin/AidlyErp.Fin.Application/AidlyErp.Fin.Application.csproj" />
+    <Project Path="src/Modules/Fin/AidlyErp.Fin.Infrastructure/AidlyErp.Fin.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Inv/">
+    <Project Path="src/Modules/Inv/AidlyErp.Inv.Domain/AidlyErp.Inv.Domain.csproj" />
+    <Project Path="src/Modules/Inv/AidlyErp.Inv.Contracts/AidlyErp.Inv.Contracts.csproj" />
+    <Project Path="src/Modules/Inv/AidlyErp.Inv.Application/AidlyErp.Inv.Application.csproj" />
+    <Project Path="src/Modules/Inv/AidlyErp.Inv.Infrastructure/AidlyErp.Inv.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Pur/">
+    <Project Path="src/Modules/Pur/AidlyErp.Pur.Domain/AidlyErp.Pur.Domain.csproj" />
+    <Project Path="src/Modules/Pur/AidlyErp.Pur.Contracts/AidlyErp.Pur.Contracts.csproj" />
+    <Project Path="src/Modules/Pur/AidlyErp.Pur.Application/AidlyErp.Pur.Application.csproj" />
+    <Project Path="src/Modules/Pur/AidlyErp.Pur.Infrastructure/AidlyErp.Pur.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Sal/">
+    <Project Path="src/Modules/Sal/AidlyErp.Sal.Domain/AidlyErp.Sal.Domain.csproj" />
+    <Project Path="src/Modules/Sal/AidlyErp.Sal.Contracts/AidlyErp.Sal.Contracts.csproj" />
+    <Project Path="src/Modules/Sal/AidlyErp.Sal.Application/AidlyErp.Sal.Application.csproj" />
+    <Project Path="src/Modules/Sal/AidlyErp.Sal.Infrastructure/AidlyErp.Sal.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/Architecture/">
+    <Project Path="tests/Architecture/AidlyErp.Architecture.Tests/AidlyErp.Architecture.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AidlyErp.Tests/AidlyErp.Tests.csproj" />

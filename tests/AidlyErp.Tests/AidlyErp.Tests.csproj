@@ -18,10 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\AidlyErp.Api\AidlyErp.Api.csproj" />
-    <ProjectReference Include="..\..\src\AidlyErp.Application\AidlyErp.Application.csproj" />
-    <ProjectReference Include="..\..\src\AidlyErp.Domain\AidlyErp.Domain.csproj" />
-    <ProjectReference Include="..\..\src\AidlyErp.Infrastructure\AidlyErp.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Host\AidlyErp.Api\AidlyErp.Api.csproj" />
   </ItemGroup>
 
   <ItemGroup>

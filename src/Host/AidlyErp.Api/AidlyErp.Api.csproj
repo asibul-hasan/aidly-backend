@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Sys\AidlyErp.Sys.Infrastructure\AidlyErp.Sys.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Hrm\AidlyErp.Hrm.Infrastructure\AidlyErp.Hrm.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Fin\AidlyErp.Fin.Infrastructure\AidlyErp.Fin.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Inv\AidlyErp.Inv.Infrastructure\AidlyErp.Inv.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Pur\AidlyErp.Pur.Infrastructure\AidlyErp.Pur.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Sal\AidlyErp.Sal.Infrastructure\AidlyErp.Sal.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Shared\AidlyErp.Shared.Infrastructure\AidlyErp.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

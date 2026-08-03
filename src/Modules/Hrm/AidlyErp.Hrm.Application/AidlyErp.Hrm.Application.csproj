@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AidlyErp.Hrm.Domain\AidlyErp.Hrm.Domain.csproj" />
+    <ProjectReference Include="..\AidlyErp.Hrm.Contracts\AidlyErp.Hrm.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Shared\AidlyErp.Shared.Core\AidlyErp.Shared.Core.csproj" />
+    <ProjectReference Include="..\..\..\Shared\AidlyErp.Shared.Contracts\AidlyErp.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\Sys\AidlyErp.Sys.Contracts\AidlyErp.Sys.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.10" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+  </ItemGroup>
+
+</Project>
