@@ -501,12 +501,22 @@ app.UseHttpsRedirection();
 
 // Java WebConfig.addResourceHandlers: serve the uploads directory at /uploads/**
 var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
-Directory.CreateDirectory(uploadPath);
-app.UseStaticFiles(new StaticFileOptions
+try
 {
-    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadPath),
-    RequestPath = "/uploads"
-});
+    if (!Directory.Exists(uploadPath))
+    {
+        Directory.CreateDirectory(uploadPath);
+    }
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadPath),
+        RequestPath = "/uploads"
+    });
+}
+catch (Exception ex)
+{
+    app.Logger.LogWarning(ex, "Could not initialize static file provider for uploads path '{UploadPath}'", uploadPath);
+}
 
 app.UseCors(CorsPolicy);
 
