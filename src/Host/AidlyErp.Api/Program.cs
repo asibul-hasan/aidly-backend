@@ -268,11 +268,15 @@ builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPur1103Service, Ai
 builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPur1105Service, AidlyErp.Pur.Application.Services.Pur1105Service>();
 builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPur1106Service, AidlyErp.Pur.Application.Services.Pur1106Service>();
 
-// ---------------------------------------------------------------------------
-// Persistence
-// ---------------------------------------------------------------------------
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Host=localhost;Database=aidly_sme;Username=postgres;Password=postgres";
+
+var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD")
+              ?? Environment.GetEnvironmentVariable("Aidly__Db__Password");
+if (!string.IsNullOrEmpty(dbPassword) && connectionString.Contains("__SET_VIA_ENV__"))
+{
+    connectionString = connectionString.Replace("__SET_VIA_ENV__", dbPassword);
+}
 
 // ---------------------------------------------------------------------------
 // Module persistence. Every module owns its own DbContext over the same physical
@@ -485,13 +489,24 @@ app.Use(async (context, next) =>
     await next();
 });
 
-if (app.Environment.IsDevelopment())
+// Serve OpenAPI specification endpoints for all module groups
+app.MapOpenApi("/v3/api-docs/{documentName}.json");
+
+// Serve interactive Swagger UI at /swagger-ui.html matching Java springdoc
+app.UseSwaggerUI(options =>
 {
-    // One document per module group, served at the Java springdoc path so existing
-    // tooling and bookmarks keep working.
-    app.MapOpenApi("/v3/api-docs/{documentName}.json");
-}
-else
+    options.RoutePrefix = "swagger-ui.html";
+    options.DocumentTitle = "Aidly ERP — API Documentation";
+    foreach (var (groupName, groupTitle) in SwaggerGroups)
+    {
+        options.SwaggerEndpoint($"/v3/api-docs/{groupName}.json", groupTitle);
+    }
+});
+
+// Redirect /swagger to /swagger-ui.html
+app.MapGet("/swagger", () => Results.Redirect("/swagger-ui.html"));
+
+if (!app.Environment.IsDevelopment())
 {
     // includeSubDomains, max-age 31536000 — matches the Java HSTS configuration
     app.UseHsts();
