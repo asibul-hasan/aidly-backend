@@ -140,4 +140,7 @@ public interface IApprovalRequestReader
 {
     /// <summary>Current status of a request, or <c>null</c> when it no longer exists.</summary>
     Task<short?> GetStatusAsync(long approvalRequestNo, CancellationToken cancellationToken = default);
+
+    /// <summary>Current status and step of a request.</summary>
+    Task<(short Status, short CurrentStep)?> GetStateAsync(long approvalRequestNo, CancellationToken cancellationToken = default);
 }

@@ -554,7 +554,14 @@ public class Hrm1301Controller : ApiControllerBase
     public async Task<IActionResult> GetDetail(long no) => OkResponse(await _service.GetDetailAsync(no));
 
     [HttpGet("leaves/status")]
-    public async Task<IActionResult> GetApprovalList([FromQuery] long? branchNo) => OkResponse(await _service.GetApprovalListAsync(branchNo));
+    public async Task<IActionResult> GetApprovalList(
+        [FromQuery] long? branchNo,
+        [FromQuery(Name = "department_no")] long? departmentNo,
+        [FromQuery(Name = "designation_no")] long? designationNo,
+        [FromQuery(Name = "employee_no")] long? employeeNo,
+        [FromQuery(Name = "leave_type_no")] long? leaveTypeNo,
+        [FromQuery(Name = "status")] int? status) =>
+        OkResponse(await _service.GetApprovalListAsync(branchNo, departmentNo, designationNo, employeeNo, leaveTypeNo, status));
 
     [HttpGet("balance")]
     public async Task<IActionResult> GetBalance([FromQuery] long employeeNo, [FromQuery] int? leaveYear) => OkResponse(await _service.GetBalanceAsync(employeeNo, leaveYear));

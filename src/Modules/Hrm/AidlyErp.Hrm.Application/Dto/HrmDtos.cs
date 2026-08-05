@@ -1215,6 +1215,9 @@ public class Hrm1301BalanceDto
 
     [JsonPropertyName("available_days")]
     public decimal AvailableDays { get; set; }
+
+    [JsonPropertyName("leave_type_name")]
+    public string? LeaveTypeName { get; set; }
 }
 
 public class Hrm1301LeaveApplicationDto
@@ -1256,7 +1259,10 @@ public class Hrm1301LeaveApplicationDto
     public string? Reason { get; set; }
 
     [JsonPropertyName("status")]
-    public short Status { get; set; } = 1; // 1=Draft 2=Applied 3=Approved 4=Rejected 5=Cancelled
+    public short Status { get; set; } = 0;
+
+    [JsonPropertyName("status_name")]
+    public string? StatusName { get; set; }
 
     [JsonPropertyName("approved_by")]
     public long? ApprovedBy { get; set; }
@@ -1291,8 +1297,14 @@ public class Hrm1301LeaveApplicationDto
     [JsonPropertyName("attachment_path")]
     public string? AttachmentPath { get; set; }
 
+    [JsonPropertyName("department_no")]
+    public long? DepartmentNo { get; set; }
+
     [JsonPropertyName("department_name")]
     public string? DepartmentName { get; set; }
+
+    [JsonPropertyName("designation_no")]
+    public long? DesignationNo { get; set; }
 
     [JsonPropertyName("designation_name")]
     public string? DesignationName { get; set; }

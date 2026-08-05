@@ -174,7 +174,6 @@ public class AuthService : IAuthService
             AccessToken = accessToken,
             RefreshToken = refreshToken,
             TokenType = "Bearer",
-            ExpiresIn = _jwtService.AccessTokenExpiration / 1000,
             UserNo = user.UserNo,
             UserId = user.UserId ?? user.UserName,
             UserName = user.UserName,
@@ -223,9 +222,7 @@ public class AuthService : IAuthService
         return new RefreshTokenResponse
         {
             AccessToken = newAccessToken,
-            RefreshToken = newRefreshToken,
-            TokenType = "Bearer",
-            ExpiresIn = 300
+            RefreshToken = newRefreshToken
         };
     }
 
@@ -308,7 +305,6 @@ public class AuthService : IAuthService
             AccessToken = accessToken,
             RefreshToken = refreshToken,
             TokenType = "Bearer",
-            ExpiresIn = 300,
             UserNo = user.UserNo,
             UserId = user.UserId ?? user.UserName,
             UserName = user.UserName,
@@ -345,7 +341,6 @@ public class AuthService : IAuthService
             AccessToken = accessToken,
             RefreshToken = refreshToken,
             TokenType = "Bearer",
-            ExpiresIn = 300,
             UserNo = user.UserNo,
             UserId = user.UserId ?? user.UserName,
             UserName = user.UserName,

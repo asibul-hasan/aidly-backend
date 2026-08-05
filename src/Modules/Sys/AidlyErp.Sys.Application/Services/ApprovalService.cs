@@ -398,12 +398,10 @@ public class ApprovalService : IApprovalService
         var empNo = await CurrentEmployeeNoAsync(cancellationToken);
         if (empNo == null) return new List<long>();
 
-        var companyNo = RequireCompany();
-
-        return await (from r in _db.ApprovalRequests.AsNoTracking()
-                      join s in _db.ApprovalRequestSteps.AsNoTracking()
+        return await (from r in _db.ApprovalRequests.AsNoTracking().IgnoreQueryFilters()
+                      join s in _db.ApprovalRequestSteps.AsNoTracking().IgnoreQueryFilters()
                           on r.ApprovalRequestNo equals s.ApprovalRequestNo
-                      where r.DocumentType == documentType && r.CompanyNo == companyNo
+                      where (r.DocumentType == documentType || r.DocumentType == "HRM_1301" || r.DocumentType == "HRM_1321")
                             && r.Status == ReqPending
                             && s.EmpNo == empNo && s.StepNumber == r.CurrentStep
                             && r.DocumentPk != null
@@ -418,15 +416,14 @@ public class ApprovalService : IApprovalService
         var empNo = await CurrentEmployeeNoAsync(cancellationToken);
         if (empNo == null) return new List<long>();
 
-        var companyNo = RequireCompany();
-
-        return await (from r in _db.ApprovalRequests.AsNoTracking()
-                      join s in _db.ApprovalRequestSteps.AsNoTracking()
+        return await (from r in _db.ApprovalRequests.AsNoTracking().IgnoreQueryFilters()
+                      join s in _db.ApprovalRequestSteps.AsNoTracking().IgnoreQueryFilters()
                           on r.ApprovalRequestNo equals s.ApprovalRequestNo
-                      where r.DocumentType == documentType && r.CompanyNo == companyNo
+                      where (r.DocumentType == documentType || r.DocumentType == "HRM_1301" || r.DocumentType == "HRM_1321")
                             && r.Status == requestStatus
                             && s.EmpNo == empNo
                             && r.DocumentPk != null
+                            && r.CurrentStep >= s.StepNumber
                       select r.DocumentPk!.Value)
             .Distinct()
             .ToListAsync(cancellationToken);
@@ -440,10 +437,10 @@ public class ApprovalService : IApprovalService
 
         var companyNo = RequireCompany();
 
-        var rows = await (from r in _db.ApprovalRequests.AsNoTracking()
-                          join s in _db.ApprovalRequestSteps.AsNoTracking()
+        var rows = await (from r in _db.ApprovalRequests.AsNoTracking().IgnoreQueryFilters()
+                          join s in _db.ApprovalRequestSteps.AsNoTracking().IgnoreQueryFilters()
                               on r.ApprovalRequestNo equals s.ApprovalRequestNo
-                          where r.DocumentType == documentType && r.CompanyNo == companyNo
+                          where (r.DocumentType == documentType || r.DocumentType == "HRM_1301" || r.DocumentType == "HRM_1321")
                                 && r.Status == ReqPending
                                 && s.EmpNo == empNo
                                 && r.DocumentPk != null
@@ -480,6 +477,86 @@ public class ApprovalService : IApprovalService
         }
 
         return views;
+    }
+
+    public async Task<Dictionary<long, string>> GetStepNamesAsync(string documentType, IEnumerable<long> documentPks,
+                                                                 CancellationToken cancellationToken = default)
+    {
+        var pkList = documentPks.Distinct().ToList();
+        if (pkList.Count == 0) return new Dictionary<long, string>();
+
+        var requests = await _db.ApprovalRequests.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(r => (r.DocumentType == documentType || r.DocumentType == "HRM_1321" || r.DocumentType == "HRM_1301")
+                        && r.DocumentPk != null && pkList.Contains(r.DocumentPk.Value))
+            .ToListAsync(cancellationToken);
+
+        var requestByPk = requests.GroupBy(r => r.DocumentPk!.Value).ToDictionary(g => g.Key, g => g.First());
+        var scopeNos = requests.Where(r => r.ScopeNo.HasValue).Select(r => r.ScopeNo!.Value).Distinct().ToList();
+
+        var menuNos = await _db.Menus.AsNoTracking()
+            .Where(m => m.FormId == documentType || m.FormId == "HRM_1321" || m.FormId == "HRM_1301")
+            .Select(m => m.MenuNo)
+            .ToListAsync(cancellationToken);
+
+        var activeScopeNos = await _db.ApprovalScopes.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(s => menuNos.Contains(s.MenuNo) && s.IsActive == 1 && s.IsDeleted == 0)
+            .Select(s => s.ScopeNo)
+            .ToListAsync(cancellationToken);
+
+        var allScopeNos = scopeNos.Concat(activeScopeNos).Distinct().ToList();
+
+        var steps = await _db.ApprovalSteps.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(s => (allScopeNos.Contains(s.ScopeNo) || allScopeNos.Count == 0) && s.IsDeleted == 0)
+            .OrderBy(s => s.StepNumber)
+            .ToListAsync(cancellationToken);
+
+        var stepDict = steps
+            .GroupBy(s => (s.ScopeNo, (int)s.StepNumber))
+            .ToDictionary(g => g.Key, g => g.First().StepName ?? $"Step {g.Key.Item2}");
+
+        var step0Name = steps
+            .Where(s => s.StepNumber == 0)
+            .Select(s => s.StepName)
+            .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name))
+            ?? steps.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.StepName))?.StepName
+            ?? "Submit For Approval";
+
+        var result = new Dictionary<long, string>();
+        foreach (var pk in pkList)
+        {
+            if (requestByPk.TryGetValue(pk, out var r))
+            {
+                if (r.Status == ReqApproved)
+                {
+                    result[pk] = "Approved";
+                }
+                else if (r.Status == ReqRejected)
+                {
+                    result[pk] = "Rejected";
+                }
+                else if (r.Status == ReqCancelled)
+                {
+                    result[pk] = "Cancelled";
+                }
+                else if (r.ScopeNo.HasValue && stepDict.TryGetValue((r.ScopeNo.Value, (int)r.CurrentStep), out var stepName) && !string.IsNullOrWhiteSpace(stepName))
+                {
+                    result[pk] = stepName;
+                }
+                else
+                {
+                    result[pk] = step0Name;
+                }
+            }
+            else
+            {
+                result[pk] = step0Name;
+            }
+        }
+
+        return result;
     }
 
     public async Task<bool> IsUntouchedAsync(long? approvalRequestNo, CancellationToken cancellationToken = default)

@@ -39,10 +39,9 @@ public class HrmApprovalListener : IApprovalCompletedListener
             case "HRM_PAYROLL":
                 await _payrollService.ApplyApprovalOutcomeAsync(documentNo, approved, ct);
                 break;
+            case "HRM_1301":
             case "HRM_LEAVE":
-                // Leave approval is handled inline in Hrm1301Service.ApproveAsync/RejectAsync
-                // via IApprovalService integration. No separate ApplyApprovalOutcomeAsync needed
-                // because the leave service already handles the approval callback directly.
+                await _leaveService.ApplyApprovalOutcomeAsync(documentNo, approved, ct);
                 break;
             case "HRM_LOAN":
                 // Loan approval is handled inline in Hrm1206Service via IApprovalService.

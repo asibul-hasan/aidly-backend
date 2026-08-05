@@ -33,9 +33,6 @@ public class LoginResponse
     [JsonPropertyName("token_type")]
     public string TokenType { get; set; } = "Bearer";
 
-    [JsonPropertyName("expires_in")]
-    public long ExpiresIn { get; set; } = 300; // 5 min in seconds
-
     [JsonPropertyName("user_no")]
     public long UserNo { get; set; }
 
@@ -108,12 +105,6 @@ public class RefreshTokenResponse
 
     [JsonPropertyName("refresh_token")]
     public string RefreshToken { get; set; } = string.Empty;
-
-    [JsonPropertyName("token_type")]
-    public string TokenType { get; set; } = "Bearer";
-
-    [JsonPropertyName("expires_in")]
-    public long ExpiresIn { get; set; } = 300;
 }
 
 public class AuthConfigResponse

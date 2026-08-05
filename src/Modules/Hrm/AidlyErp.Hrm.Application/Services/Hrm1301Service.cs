@@ -23,7 +23,14 @@ public interface IHrm1301Service
     Task<List<Hrm1301LeaveApplicationDto>> GetListByEmployeeAsync(long employeeNo, CancellationToken ct = default);
     Task<List<Hrm1301LeaveApplicationDto>> GetFilteredHistoryAsync(long employeeNo, long? leaveTypeNo, DateTime? fromDate, DateTime? toDate, CancellationToken ct = default);
     Task<Hrm1301LeaveApplicationDto> GetDetailAsync(long leaveApplicationNo, CancellationToken ct = default);
-    Task<List<Hrm1301LeaveApplicationDto>> GetApprovalListAsync(long? branchNo, CancellationToken ct = default);
+    Task<List<Hrm1301LeaveApplicationDto>> GetApprovalListAsync(
+        long? branchNo,
+        long? departmentNo = null,
+        long? designationNo = null,
+        long? employeeNo = null,
+        long? leaveTypeNo = null,
+        int? status = null,
+        CancellationToken ct = default);
     Task<List<Hrm1301BalanceDto>> GetBalanceAsync(long employeeNo, int? leaveYear, CancellationToken ct = default);
     Task<Hrm1301LeaveApplicationDto> SaveAsync(Hrm1301LeaveApplicationDto dto, CancellationToken ct = default);
     Task<Hrm1301LeaveApplicationDto> SubmitAsync(long leaveApplicationNo, CancellationToken ct = default);
@@ -143,35 +150,58 @@ public class Hrm1301Service : IHrm1301Service
 
     // ── Reads ──────────────────────────────────────────────────────────────
 
-    public async Task<List<Hrm1301LeaveApplicationDto>> GetListAsync(CancellationToken ct = default) =>
-        await _db.HrmLeaveApplications.AsNoTracking()
-            .Where(x => x.IsDeleted == 0)
-            .ApplyDataScope(_perm)
-            .OrderByDescending(x => x.LeaveApplicationNo)
-            .Select(x => ToDto(x))
+    public async Task<List<Hrm1301LeaveApplicationDto>> GetListAsync(CancellationToken ct = default)
+    {
+        var userNo = _ctx.UserNo;
+        long? empNo = userNo.HasValue ? await _users.FindEmployeeNoByUserNoAsync(userNo.Value, ct) : null;
+        var query = _db.HrmLeaveApplications.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(x => x.IsDeleted == 0);
+
+        if (empNo.HasValue && empNo.Value > 0)
+        {
+            query = query.Where(x => x.EmployeeNo == empNo.Value);
+        }
+
+        var leaves = await query.OrderByDescending(x => x.LeaveApplicationNo).ToListAsync(ct);
+        var dtos = leaves.Select(x => ToDto(x)).ToList();
+        await PopulateRelieverNamesAsync(dtos, ct);
+        await PopulateApprovalStatesAsync(dtos, ct);
+        return dtos;
+    }
+
+    public async Task<List<Hrm1301LeaveApplicationDto>> GetListByEmployeeAsync(long employeeNo, CancellationToken ct = default)
+    {
+        if (employeeNo <= 0) return new();
+        var leaves = await _db.HrmLeaveApplications.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(x => x.EmployeeNo == employeeNo && x.IsDeleted == 0)
+            .OrderByDescending(x => x.FromDate)
             .ToListAsync(ct);
 
-    // employeeNo arrives from the caller, so the data scope is what stops an EMPLOYEE-scoped
-    // user from reading someone else's leave history by passing their number.
-    public async Task<List<Hrm1301LeaveApplicationDto>> GetListByEmployeeAsync(long employeeNo, CancellationToken ct = default) =>
-        await _db.HrmLeaveApplications.AsNoTracking()
-            .Where(x => x.EmployeeNo == employeeNo && x.IsDeleted == 0)
-            .ApplyDataScope(_perm)
-            .OrderByDescending(x => x.FromDate)
-            .Select(x => ToDto(x))
-            .ToListAsync(ct);
+        var dtos = leaves.Select(x => ToDto(x)).ToList();
+        await PopulateRelieverNamesAsync(dtos, ct);
+        await PopulateApprovalStatesAsync(dtos, ct);
+        return dtos;
+    }
 
     public async Task<List<Hrm1301LeaveApplicationDto>> GetFilteredHistoryAsync(
         long employeeNo, long? leaveTypeNo, DateTime? fromDate, DateTime? toDate, CancellationToken ct = default)
     {
         if (employeeNo <= 0) return new();
         var query = _db.HrmLeaveApplications.AsNoTracking()
-            .Where(x => x.EmployeeNo == employeeNo && x.IsDeleted == 0)
-            .ApplyDataScope(_perm);
+            .IgnoreQueryFilters()
+            .Where(x => x.EmployeeNo == employeeNo && x.IsDeleted == 0);
+
         if (leaveTypeNo.HasValue) query = query.Where(x => x.LeaveTypeNo == leaveTypeNo.Value);
         if (fromDate.HasValue) query = query.Where(x => x.FromDate >= fromDate.Value);
         if (toDate.HasValue) query = query.Where(x => x.FromDate <= toDate.Value);
-        return await query.OrderByDescending(x => x.FromDate).Select(x => ToDto(x)).ToListAsync(ct);
+
+        var leaves = await query.OrderByDescending(x => x.FromDate).ToListAsync(ct);
+        var dtos = leaves.Select(x => ToDto(x)).ToList();
+        await PopulateRelieverNamesAsync(dtos, ct);
+        await PopulateApprovalStatesAsync(dtos, ct);
+        return dtos;
     }
 
     public async Task<Hrm1301LeaveApplicationDto> GetDetailAsync(long leaveApplicationNo, CancellationToken ct = default)
@@ -189,7 +219,48 @@ public class Hrm1301Service : IHrm1301Service
             if (reliever != null)
                 dto.RelieverName = $"{reliever.FirstName}{(string.IsNullOrWhiteSpace(reliever.LastName) ? "" : " " + reliever.LastName)}";
         }
+        await PopulateApprovalStatesAsync(new List<Hrm1301LeaveApplicationDto> { dto }, ct);
         return dto;
+    }
+
+    private async Task PopulateRelieverNamesAsync(List<Hrm1301LeaveApplicationDto> dtos, CancellationToken ct)
+    {
+        var relieverNos = dtos
+            .Where(d => d.RelieverEmployeeNo.HasValue && d.RelieverEmployeeNo.Value > 0)
+            .Select(d => d.RelieverEmployeeNo!.Value)
+            .Distinct()
+            .ToList();
+        if (relieverNos.Count == 0) return;
+
+        var relievers = await _db.HrmEmployees.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(e => relieverNos.Contains(e.EmployeeNo) && e.IsDeleted == 0)
+            .ToDictionaryAsync(e => e.EmployeeNo, ct);
+
+        foreach (var dto in dtos)
+        {
+            if (dto.RelieverEmployeeNo.HasValue && relievers.TryGetValue(dto.RelieverEmployeeNo.Value, out var rel))
+            {
+                dto.RelieverName = $"{rel.FirstName}{(string.IsNullOrWhiteSpace(rel.LastName) ? "" : " " + rel.LastName)}";
+            }
+        }
+    }
+
+    private async Task PopulateApprovalStatesAsync(List<Hrm1301LeaveApplicationDto> dtos, CancellationToken ct)
+    {
+        if (dtos.Count == 0) return;
+        var pks = dtos.Where(d => d.LeaveApplicationNo.HasValue).Select(d => d.LeaveApplicationNo!.Value).ToList();
+        if (pks.Count == 0) return;
+
+        var stepNames = await _approvalService.GetStepNamesAsync(ApprovalFormId, pks, ct);
+        foreach (var dto in dtos)
+        {
+            if (dto.LeaveApplicationNo.HasValue && stepNames.TryGetValue(dto.LeaveApplicationNo.Value, out var name))
+            {
+                dto.ApprovalState = name;
+                dto.StatusName = name;
+            }
+        }
     }
 
     /// <summary>
@@ -198,35 +269,103 @@ public class Hrm1301Service : IHrm1301Service
     /// empty inbox and the workflow would stall. Authorization here is the approval workflow's own
     /// <c>approver_role_no</c> check plus the RBAC APPROVE bit, not the data scope.
     /// </summary>
-    public async Task<List<Hrm1301LeaveApplicationDto>> GetApprovalListAsync(long? branchNo, CancellationToken ct = default)
+    public async Task<List<Hrm1301LeaveApplicationDto>> GetApprovalListAsync(
+        long? branchNo,
+        long? departmentNo = null,
+        long? designationNo = null,
+        long? employeeNo = null,
+        long? leaveTypeNo = null,
+        int? status = null,
+        CancellationToken ct = default)
     {
         var query = _db.HrmLeaveApplications.AsNoTracking()
-            .Where(x => x.IsDeleted == 0 && x.Status == StApplied);
+            .IgnoreQueryFilters()
+            .Where(x => x.IsDeleted == 0);
+
+        if (!status.HasValue || status.Value == 0 || status.Value == StApplied)
+        {
+            var involvedPks = await _approvalService.GetPendingDocumentPksForCurrentApproverAsync(DocType, ct);
+            if (involvedPks.Count > 0)
+            {
+                query = query.Where(x => involvedPks.Contains(x.LeaveApplicationNo));
+            }
+            else if (!employeeNo.HasValue && !departmentNo.HasValue && !designationNo.HasValue)
+            {
+                return new();
+            }
+        }
+        else
+        {
+            query = query.Where(x => x.Status == (short)status.Value);
+            short reqStatus = (short)(status.Value == StApproved ? 2 : status.Value == StRejected ? 3 : status.Value == StCancelled ? 4 : status.Value);
+            var involvedPks = await _approvalService.GetInvolvedDocumentPksAsync(DocType, reqStatus, ct);
+            if (involvedPks.Count > 0)
+            {
+                query = query.Where(x => involvedPks.Contains(x.LeaveApplicationNo));
+            }
+            else if (!employeeNo.HasValue && !departmentNo.HasValue && !designationNo.HasValue)
+            {
+                return new();
+            }
+        }
+
         if (branchNo.HasValue) query = query.Where(x => x.BranchNo == branchNo.Value);
+        if (employeeNo.HasValue) query = query.Where(x => x.EmployeeNo == employeeNo.Value);
+        if (leaveTypeNo.HasValue) query = query.Where(x => x.LeaveTypeNo == leaveTypeNo.Value);
 
         var leaves = await query.OrderByDescending(x => x.LeaveApplicationNo).ToListAsync(ct);
         if (leaves.Count == 0) return new();
 
-        // Batch-load employee/department/designation/leave-type names.
+        // Batch-load employee/department/designation/leave-type names with IgnoreQueryFilters
+        // so global tenant/department query filters don't strip cross-department employee details.
         var employeeNos = leaves.Select(x => x.EmployeeNo).Distinct().ToList();
         var employees = await _db.HrmEmployees.AsNoTracking()
+            .IgnoreQueryFilters()
             .Where(e => employeeNos.Contains(e.EmployeeNo) && e.IsDeleted == 0)
             .ToDictionaryAsync(e => e.EmployeeNo, ct);
 
+        if (departmentNo.HasValue)
+        {
+            leaves = leaves.Where(x => employees.TryGetValue(x.EmployeeNo, out var emp) && emp.DepartmentNo == departmentNo.Value).ToList();
+        }
+        if (designationNo.HasValue)
+        {
+            leaves = leaves.Where(x => employees.TryGetValue(x.EmployeeNo, out var emp) && emp.DesignationNo == designationNo.Value).ToList();
+        }
+
         var deptNos = employees.Values.Where(e => e.DepartmentNo > 0).Select(e => e.DepartmentNo).Distinct().ToList();
         var departments = await _db.HrmDepartments.AsNoTracking()
+            .IgnoreQueryFilters()
             .Where(d => deptNos.Contains(d.DepartmentNo) && d.IsDeleted == 0)
             .ToDictionaryAsync(d => d.DepartmentNo, d => d.DepartmentName, ct);
 
         var desigNos = employees.Values.Where(e => e.DesignationNo > 0).Select(e => e.DesignationNo).Distinct().ToList();
         var designations = await _db.HrmDesignations.AsNoTracking()
+            .IgnoreQueryFilters()
             .Where(d => desigNos.Contains(d.DesignationNo) && d.IsDeleted == 0)
             .ToDictionaryAsync(d => d.DesignationNo, d => d.DesignationName, ct);
 
         var typeNos = leaves.Select(x => x.LeaveTypeNo).Distinct().ToList();
         var leaveTypes = await _db.HrmLeaveTypes.AsNoTracking()
+            .IgnoreQueryFilters()
             .Where(t => typeNos.Contains(t.LeaveTypeNo) && t.IsDeleted == 0)
             .ToDictionaryAsync(t => t.LeaveTypeNo, t => t.LeaveTypeName, ct);
+
+        var leavePks = leaves.Select(l => l.LeaveApplicationNo).ToList();
+        var stepNames = await _approvalService.GetStepNamesAsync(DocType, leavePks, ct);
+        var approverViews = await _approvalService.GetApproverViewsAsync(DocType, ct);
+
+        // Batch-load reliever names for all leaves that have a reliever.
+        var relieverNos = leaves
+            .Where(x => x.RelieverEmployeeNo.HasValue && x.RelieverEmployeeNo.Value > 0)
+            .Select(x => x.RelieverEmployeeNo!.Value)
+            .Distinct()
+            .ToList();
+        var relieverNames = relieverNos.Count > 0
+            ? await _db.HrmEmployees.AsNoTracking().IgnoreQueryFilters()
+                .Where(e => relieverNos.Contains(e.EmployeeNo) && e.IsDeleted == 0)
+                .ToDictionaryAsync(e => e.EmployeeNo, ct)
+            : new Dictionary<long, HrmEmployee>();
 
         return leaves.Select(e =>
         {
@@ -236,26 +375,77 @@ public class Hrm1301Service : IHrm1301Service
             {
                 dto.EmployeeId = emp.EmployeeId;
                 dto.EmployeeName = $"{emp.FirstName}{(string.IsNullOrWhiteSpace(emp.LastName) ? "" : " " + emp.LastName)}";
-                if (emp.DepartmentNo > 0) dto.DepartmentName = departments.GetValueOrDefault(emp.DepartmentNo);
-                if (emp.DesignationNo > 0) dto.DesignationName = designations.GetValueOrDefault(emp.DesignationNo);
+                if (emp.DepartmentNo > 0)
+                {
+                    dto.DepartmentNo = emp.DepartmentNo;
+                    dto.DepartmentName = departments.GetValueOrDefault(emp.DepartmentNo);
+                }
+                if (emp.DesignationNo > 0)
+                {
+                    dto.DesignationNo = emp.DesignationNo;
+                    dto.DesignationName = designations.GetValueOrDefault(emp.DesignationNo);
+                }
             }
-            dto.ApprovalState = "PENDING";
-            dto.CanAct = true;
+            // Populate reliever name.
+            if (e.RelieverEmployeeNo.HasValue && relieverNames.TryGetValue(e.RelieverEmployeeNo.Value, out var rel))
+            {
+                dto.RelieverName = $"{rel.FirstName}{(string.IsNullOrWhiteSpace(rel.LastName) ? "" : " " + rel.LastName)}";
+            }
+            if (stepNames.TryGetValue(e.LeaveApplicationNo, out var dynamicState))
+            {
+                dto.ApprovalState = dynamicState;
+            }
+            else
+            {
+                dto.ApprovalState = e.Status == StApproved ? "Approved" : e.Status == StRejected ? "Rejected" : e.Status == StCancelled ? "Cancelled" : "Pending";
+            }
+            bool isActionable = approverViews.TryGetValue(e.LeaveApplicationNo, out var view) && view == ApproverView.Actionable;
+            dto.CanAct = isActionable;
             return dto;
         }).ToList();
     }
 
     public async Task<List<Hrm1301BalanceDto>> GetBalanceAsync(long employeeNo, int? leaveYear, CancellationToken ct = default)
     {
+        if (employeeNo <= 0) return new();
         int year = leaveYear ?? DateTime.UtcNow.Year;
+
         var balances = await _db.HrmLeaveBalances.AsNoTracking()
+            .IgnoreQueryFilters()
             .Where(b => b.EmployeeNo == employeeNo && b.LeaveYear == year && b.IsDeleted == 0)
             .ToListAsync(ct);
+
+        if (balances.Count == 0)
+        {
+            var emp = await _db.HrmEmployees.AsNoTracking().IgnoreQueryFilters()
+                .FirstOrDefaultAsync(e => e.EmployeeNo == employeeNo && e.IsDeleted == 0, ct);
+            long branchNo = emp?.BranchNo ?? _ctx.BranchNo ?? 1;
+
+            var activeLeaveTypes = await _db.HrmLeaveTypes.AsNoTracking().IgnoreQueryFilters()
+                .Where(t => t.IsDeleted == 0 && t.IsActive == 1)
+                .ToListAsync(ct);
+
+            foreach (var type in activeLeaveTypes)
+            {
+                await GetOrCreateBalanceAsync(employeeNo, type.LeaveTypeNo, year, branchNo, type, ct);
+            }
+
+            balances = await _db.HrmLeaveBalances.AsNoTracking()
+                .IgnoreQueryFilters()
+                .Where(b => b.EmployeeNo == employeeNo && b.LeaveYear == year && b.IsDeleted == 0)
+                .ToListAsync(ct);
+        }
+
+        var leaveTypeNos = balances.Select(b => b.LeaveTypeNo).Distinct().ToList();
+        var typeNames = await _db.HrmLeaveTypes.AsNoTracking().IgnoreQueryFilters()
+            .Where(t => leaveTypeNos.Contains(t.LeaveTypeNo))
+            .ToDictionaryAsync(t => t.LeaveTypeNo, t => t.LeaveTypeName, ct);
 
         return balances.Select(b => new Hrm1301BalanceDto
         {
             EmployeeNo = b.EmployeeNo,
             LeaveTypeNo = b.LeaveTypeNo,
+            LeaveTypeName = typeNames.GetValueOrDefault(b.LeaveTypeNo),
             LeaveYear = b.LeaveYear,
             EntitledDays = b.EntitledDays,
             AccruedDays = b.AccruedDays,
@@ -312,7 +502,7 @@ public class Hrm1301Service : IHrm1301Service
             Reason = dto.Reason,
             RelieverEmployeeNo = dto.RelieverEmployeeNo,
             AttachmentPath = dto.AttachmentPath,
-            Status = StApplied, // saving IS applying
+            Status = dto.Status,
             IsActive = 1,
             IsDeleted = 0,
             CreatedBy = _ctx.CurrentUserNo(),
@@ -328,7 +518,7 @@ public class Hrm1301Service : IHrm1301Service
         // that auto-approves (no workflow configured) still needs its reliever told.
         await NotifyRelieverAsync(e, ct);
 
-        return ToDto(await LoadLiveAsync(e.LeaveApplicationNo, ct));
+        return await GetDetailAsync(e.LeaveApplicationNo, ct);
     }
 
     private async Task<Hrm1301LeaveApplicationDto> UpdateAsync(long no, Hrm1301LeaveApplicationDto dto, CancellationToken ct)
@@ -375,7 +565,7 @@ public class Hrm1301Service : IHrm1301Service
             await RouteForApprovalAsync(e, ct);
         }
 
-        return ToDto(await LoadLiveAsync(no, ct));
+        return await GetDetailAsync(no, ct);
     }
 
     // ── Workflow transitions ───────────────────────────────────────────────
@@ -430,7 +620,8 @@ public class Hrm1301Service : IHrm1301Service
     public async Task<Hrm1301LeaveApplicationDto> ApproveAsync(long leaveApplicationNo, string? remarks, CancellationToken ct = default)
     {
         var e = await LoadLiveAsync(leaveApplicationNo, ct);
-        if (e.Status != StApplied) throw new ValidationException("Only an Applied leave can be approved");
+        if (e.Status == StApproved || e.Status == StRejected || e.Status == StCancelled)
+            throw new ValidationException($"This leave is already {StatusName(e.Status)} and cannot be approved");
         if (!e.ApprovalRequestNo.HasValue) throw new ValidationException("No approval request — submit the leave first");
         if (!string.IsNullOrWhiteSpace(remarks))
         {
@@ -438,19 +629,38 @@ public class Hrm1301Service : IHrm1301Service
             await _db.SaveChangesAsync(ct);
         }
         await _approvalService.ActAsync(e.ApprovalRequestNo.Value, true, remarks, ct);
+
+        // Sync document status with intermediate workflow step
+        var state = await _approvals.GetStateAsync(e.ApprovalRequestNo.Value, ct);
+        if (state != null && state.Value.Status == 1 /* ReqPending */)
+        {
+            e.Status = state.Value.CurrentStep;
+            await _db.SaveChangesAsync(ct);
+        }
+
         return ToDto(await LoadLiveAsync(leaveApplicationNo, ct));
     }
 
     public async Task<Hrm1301LeaveApplicationDto> RejectAsync(long leaveApplicationNo, string? remarks, CancellationToken ct = default)
     {
         var e = await LoadLiveAsync(leaveApplicationNo, ct);
-        if (e.Status != StApplied) throw new ValidationException("Only an Applied leave can be rejected");
+        if (e.Status == StApproved || e.Status == StRejected || e.Status == StCancelled)
+            throw new ValidationException($"This leave is already {StatusName(e.Status)} and cannot be rejected");
         if (!e.ApprovalRequestNo.HasValue) throw new ValidationException("No approval request — submit the leave first");
         if (string.IsNullOrWhiteSpace(remarks))
             throw new ValidationException("A reason is required to reject a leave request");
         e.DecisionRemarks = remarks;
         await _db.SaveChangesAsync(ct);
         await _approvalService.ActAsync(e.ApprovalRequestNo.Value, false, remarks, ct);
+
+        // Sync document status with intermediate workflow step (e.g. backward routing)
+        var state = await _approvals.GetStateAsync(e.ApprovalRequestNo.Value, ct);
+        if (state != null && state.Value.Status == 1 /* ReqPending */)
+        {
+            e.Status = state.Value.CurrentStep;
+            await _db.SaveChangesAsync(ct);
+        }
+
         return ToDto(await LoadLiveAsync(leaveApplicationNo, ct));
     }
 
@@ -472,7 +682,8 @@ public class Hrm1301Service : IHrm1301Service
 
         // Re-validate balance at approval time (may have changed since application).
         var applicant = await _db.HrmEmployees.AsNoTracking()
-            .FirstOrDefaultAsync(emp => emp.EmployeeNo == e.EmployeeNo && emp.IsDeleted == 0, ct);
+            .FirstOrDefaultAsync(emp => emp.EmployeeNo == e.EmployeeNo && emp.IsDeleted == 0, ct)
+            ?? throw new NotFoundException("Employee not found");
         var rules = await _ruleEngine.ResolveRulesAsync(e.LeaveTypeNo, applicant, ct);
         _ruleEngine.ValidateBalance(leaveType, rules, balance.AvailableDays, e.TotalDays);
 
@@ -521,11 +732,12 @@ public class Hrm1301Service : IHrm1301Service
     public async Task DeleteAsync(long leaveApplicationNo, CancellationToken ct = default)
     {
         var e = await LoadLiveAsync(leaveApplicationNo, ct);
-        bool ownedByApplicant = e.Status == StDraft
-            || (e.Status == StApplied && await IsApprovalUntouchedAsync(e.ApprovalRequestNo, ct));
-        if (!ownedByApplicant)
-            throw new ValidationException("Approval has already started on this leave — cancel it instead of deleting");
-
+        
+        if (e.Status != 0)
+        {
+            throw new ValidationException("Only new leave applications (status 0) can be deleted.");
+        }
+        
         if (e.ApprovalRequestNo.HasValue)
             await _approvalService.CancelRequestAsync(e.ApprovalRequestNo.Value, ct);
 
@@ -787,6 +999,6 @@ public class Hrm1301Service : IHrm1301Service
         RelieverRemarks = e.RelieverRemarks,
         AttachmentPath = e.AttachmentPath,
         DecisionRemarks = e.DecisionRemarks,
-        CanEdit = e.Status == StDraft || e.Status == StApplied
+        CanEdit = e.Status == 0 || e.Status == StDraft || e.Status == StApplied
     };
 }

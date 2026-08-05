@@ -292,4 +292,16 @@ internal sealed class ApprovalRequestReader : IApprovalRequestReader
             .Where(r => r.ApprovalRequestNo == approvalRequestNo)
             .Select(r => (short?)r.Status)
             .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<(short Status, short CurrentStep)?> GetStateAsync(long approvalRequestNo, CancellationToken cancellationToken = default)
+    {
+        var req = await _db.ApprovalRequests
+            .AsNoTracking()
+            .Where(r => r.ApprovalRequestNo == approvalRequestNo)
+            .Select(r => new { r.Status, r.CurrentStep })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (req == null) return null;
+        return (req.Status, req.CurrentStep);
+    }
 }

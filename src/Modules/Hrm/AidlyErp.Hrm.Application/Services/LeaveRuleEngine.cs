@@ -27,7 +27,7 @@ public class LeaveRuleEngine : ILeaveRuleEngine
 {
     private readonly IHrmDbContext _db;
     private const short Deleted = 0;
-    private static readonly List<short> BlockingStatuses = new() { 2, 3 }; // Applied, Approved
+    private static readonly List<short> BlockingStatuses = new() { 0, 1, 2, 3 }; // 0=Submitted, 1=Draft, 2=Applied, 3=Approved
 
     public LeaveRuleEngine(IHrmDbContext db)
     {
@@ -205,10 +205,11 @@ public class LeaveRuleEngine : ILeaveRuleEngine
     {
         var query = _db.HrmLeaveApplications
             .AsNoTracking()
+            .IgnoreQueryFilters()
             .Where(a => a.EmployeeNo == employee.EmployeeNo &&
                         a.IsDeleted == Deleted &&
                         BlockingStatuses.Contains(a.Status) &&
-                        a.FromDate <= toDate && a.ToDate >= fromDate);
+                        a.FromDate.Date <= toDate.Date && a.ToDate.Date >= fromDate.Date);
 
         if (excludeNo.HasValue)
         {
