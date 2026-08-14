@@ -277,6 +277,40 @@ public class DocSequence : AuditEntity
     [StringLength(20)]
     public string? Prefix { get; set; }
 
+    [Column("suffix")]
+    [StringLength(20)]
+    public string Suffix { get; set; } = string.Empty;
+
     [Column("next_no")]
     public long NextVal { get; set; } = 1;
+
+    /// <summary>Where the series began. Kept apart from <see cref="NextVal"/> so a period reset
+    /// returns to a known number instead of guessing.</summary>
+    [Column("starting_no")]
+    public long StartingNo { get; set; } = 1;
+
+    [Column("padding")]
+    public short Padding { get; set; } = 6;
+
+    /// <summary>1=Yearly 2=Never 3=Monthly — when the counter returns to <see cref="StartingNo"/>.</summary>
+    [Column("reset_policy")]
+    public short ResetPolicy { get; set; } = 2;
+
+    /// <summary>Full template, e.g. <c>INV-{FY_YY_YY}-{SEQ:6}</c>. NULL keeps the older
+    /// prefix + padding behaviour, so existing series are unaffected.</summary>
+    [Column("pattern")]
+    [StringLength(200)]
+    public string? Pattern { get; set; }
+
+    /// <summary>Separates series that share a doc_type — cash versus credit sales, say.</summary>
+    [Column("doc_sub_type")]
+    [StringLength(30)]
+    public string DocSubType { get; set; } = string.Empty;
+
+    /// <summary>The form this series belongs to, so SYS_1301 can list series by screen.</summary>
+    [Column("menu_no")]
+    public long? MenuNo { get; set; }
+
+    [Column("fin_year_no")]
+    public long? FinYearNo { get; set; }
 }

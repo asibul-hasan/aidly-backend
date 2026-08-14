@@ -116,6 +116,7 @@ builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1104Service, Ai
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1105Service, AidlyErp.Sys.Application.Services.Sys1105Service>();
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1107Service, AidlyErp.Sys.Application.Services.Sys1107Service>();
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1108Service, AidlyErp.Sys.Application.Services.Sys1108Service>();
+builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1301Service, AidlyErp.Sys.Application.Services.Sys1301Service>();
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1109Service, AidlyErp.Sys.Application.Services.Sys1109Service>();
 builder.Services.AddSingleton<AidlyErp.Sys.Application.Services.IPathFormCacheInvalidator, AidlyErp.Api.Controllers.Sys.PathFormCacheInvalidator>();
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1201Service, AidlyErp.Sys.Application.Services.Sys1201Service>();
