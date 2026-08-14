@@ -28,6 +28,8 @@ public interface IInvDbContext
     DbSet<InvStockAdjustmentDtl> InvStockAdjustmentDtls { get; }
     DbSet<InvStockTransfer> InvStockTransfers { get; }
     DbSet<InvStockTransferDtl> InvStockTransferDtls { get; }
+    DbSet<InvPhysicalCount> InvPhysicalCounts { get; }
+    DbSet<InvPhysicalCountDtl> InvPhysicalCountDtls { get; }
 
     DbSet<AidlyErp.Shared.Core.EventOutbox> EventOutboxes { get; }
 

@@ -21,11 +21,11 @@ public class HrmLeaveType : AuditEntity, IBranchScopedEntity
     public string LeaveTypeName { get; set; } = string.Empty;
 
     [Column("is_paid")]
-    public short IsPaid { get; set; } = 1;
+    public short? IsPaid { get; set; } = 1;
 
     [Column("statutory_category")]
     [StringLength(20)]
-    public string StatutoryCategory { get; set; } = "NONE";
+    public string? StatutoryCategory { get; set; }
 
     [Column("branch_no")]
     public long? BranchNo { get; set; }

@@ -11,8 +11,19 @@ public class Inv1001Controller : ApiControllerBase
     private readonly IInv1001Service _service;
     public Inv1001Controller(IInv1001Service service) => _service = service;
 
+    /// <summary>Categories, brands, UOMs, tax codes and the attribute axes with their values.</summary>
+    [HttpGet("lookups")]
+    public async Task<IActionResult> GetLookups() => OkResponse(await _service.GetLookupsAsync());
+
     [HttpGet("products")]
     public async Task<IActionResult> GetList() => OkResponse(await _service.GetListAsync());
+
+    [HttpPut("products/{id:long}")]
+    public async Task<IActionResult> Update(long id, [FromBody] Inv1001ProductDto dto)
+    {
+        dto.ProductNo = id;
+        return OkResponse(await _service.SaveAsync(dto), "Product updated");
+    }
 
     [HttpGet("products/{id:long}")]
     public async Task<IActionResult> GetDetail(long id) => OkResponse(await _service.GetDetailAsync(id));

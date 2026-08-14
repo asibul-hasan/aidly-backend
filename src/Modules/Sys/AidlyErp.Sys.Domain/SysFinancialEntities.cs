@@ -87,7 +87,7 @@ public class FinYear : AuditEntity
     public long FinYearNo { get; set; }
 
     [Column("company_no")]
-    public long CompanyNo { get; set; }
+    public long? CompanyNo { get; set; }
 
     [Column("fin_year_id")]
     [StringLength(20)]

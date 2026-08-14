@@ -92,6 +92,15 @@ public class FinVoucherDtl : AuditEntity
     [Column("voucher_dtl_no")]
     public long VoucherDtlNo { get; set; }
 
+    // Both are NOT NULL in fin_voucher_dtl and were not mapped, so every voucher line insert failed
+    // with 23502. FinVoucher and FinLedger both carry them; this entity was the odd one out, which
+    // meant no voucher written by this backend could save — the whole GL posting path was dead.
+    [Column("company_no")]
+    public long CompanyNo { get; set; }
+
+    [Column("branch_no")]
+    public long BranchNo { get; set; }
+
     [Column("voucher_no")]
     public long VoucherNo { get; set; }
 
@@ -137,6 +146,12 @@ public class FinVoucherDtl : AuditEntity
     [Column("against_voucher_no")]
     public long? AgainstVoucherNo { get; set; }
 
+    [Column("vat_tax_no")]
+    public long? VatTaxNo { get; set; }
+
+    [Column("tax_rate_pct")]
+    public decimal? TaxRatePct { get; set; }
+
     [Column("line_narration")]
     [StringLength(500)]
     public string? LineNarration { get; set; }
@@ -174,6 +189,24 @@ public class FinVoucherType : AuditEntity
     [StringLength(10)]
     public string? Prefix { get; set; }
 
+    [Column("default_dr_account_no")]
+    public long? DefaultDrAccountNo { get; set; }
+
+    [Column("default_cr_account_no")]
+    public long? DefaultCrAccountNo { get; set; }
+
+    [Column("is_system")]
+    public short IsSystem { get; set; } = 0;
+
+    [Column("order_sl")]
+    public int OrderSl { get; set; } = 0;
+
+    [Column("company_no")]
+    public long CompanyNo { get; set; }
+
+    [Column("branch_no")]
+    public long? BranchNo { get; set; }
+
     /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
     [NotMapped]
     public short RequiresApproval { get; set; } = 0;
@@ -181,9 +214,6 @@ public class FinVoucherType : AuditEntity
     /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
     [NotMapped]
     public short IsAutoNumbered { get; set; } = 1;
-
-    [Column("company_no")]
-    public long CompanyNo { get; set; }
 
     [NotMapped]
     public string TypeCode { get => VoucherTypeCode; set => VoucherTypeCode = value; }
@@ -261,6 +291,21 @@ public class FinLedger : AuditEntity
     [Column("fin_period_no")]
     public long FinPeriodNo { get; set; }
 
+    [Column("cost_center_no")]
+    public long? CostCenterNo { get; set; }
+
+    [Column("party_type")]
+    public short? PartyType { get; set; }
+
+    [Column("party_no")]
+    public long? PartyNo { get; set; }
+
+    [Column("is_reversal")]
+    public short IsReversal { get; set; } = 0;
+
+    [Column("vat_tax_no")]
+    public long? VatTaxNo { get; set; }
+
     [Column("company_no")]
     public long CompanyNo { get; set; }
 
@@ -276,20 +321,32 @@ public class FinBankAccount : AuditEntity
     [Column("bank_account_no")]
     public long BankAccountNo { get; set; }
 
+    [Column("bank_account_id")]
+    [StringLength(30)]
+    public string? BankAccountId { get; set; }
+
     [Column("account_no")]
     public long AccountNo { get; set; }
 
     [Column("bank_name")]
-    [StringLength(100)]
-    public string BankName { get; set; } = string.Empty;
+    [StringLength(150)]
+    public string? BankName { get; set; }
 
     [Column("branch_name")]
-    [StringLength(100)]
+    [StringLength(150)]
     public string? BranchName { get; set; }
 
+    [Column("account_title")]
+    [StringLength(200)]
+    public string? AccountTitle { get; set; }
+
     [Column("account_number")]
-    [StringLength(50)]
-    public string AccountNumber { get; set; } = string.Empty;
+    [StringLength(60)]
+    public string? AccountNumber { get; set; }
+
+    [Column("routing_number")]
+    [StringLength(30)]
+    public string? RoutingNumber { get; set; }
 
     [Column("swift_code")]
     [StringLength(20)]
@@ -303,11 +360,14 @@ public class FinBankAccount : AuditEntity
     [Column("currency_no")]
     public long? CurrencyNo { get; set; }
 
+    [Column("opening_balance")]
+    public decimal OpeningBalance { get; set; } = 0m;
+
     [Column("company_no")]
     public long CompanyNo { get; set; }
 
     [Column("branch_no")]
-    public long BranchNo { get; set; }
+    public long? BranchNo { get; set; }
 }
 
 [Table("fin_bank_recon")]
@@ -317,6 +377,10 @@ public class FinBankRecon : AuditEntity
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     [Column("bank_recon_no")]
     public long ReconNo { get; set; }
+
+    [Column("bank_recon_id")]
+    [StringLength(30)]
+    public string? BankReconId { get; set; }
 
     [Column("account_no")]
     public long AccountNo { get; set; }
@@ -330,12 +394,10 @@ public class FinBankRecon : AuditEntity
     [Column("book_balance")]
     public decimal BookBalance { get; set; }
 
-    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
-    [NotMapped]
+    [Column("cleared_debits")]
     public decimal ClearedDebits { get; set; }
 
-    /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
-    [NotMapped]
+    [Column("cleared_credits")]
     public decimal ClearedCredits { get; set; }
 
     [Column("cleared_balance")]
@@ -351,6 +413,12 @@ public class FinBankRecon : AuditEntity
     [Column("narration")]
     [StringLength(250)]
     public string? Remarks { get; set; }
+
+    [Column("company_no")]
+    public long CompanyNo { get; set; }
+
+    [Column("branch_no")]
+    public long? BranchNo { get; set; }
 
     [NotMapped]
     public long BankAccountNo { get => AccountNo; set => AccountNo = value; }
@@ -373,9 +441,11 @@ public class FinBankReconLine : AuditEntity
     [Column("ledger_no")]
     public long LedgerNo { get; set; }
 
-    /// <summary>Not a column — the line points at the ledger entry, not a voucher line.</summary>
-    [NotMapped]
-    public long VoucherDtlNo { get; set; }
+    [Column("debit")]
+    public decimal Debit { get; set; } = 0m;
+
+    [Column("credit")]
+    public decimal Credit { get; set; } = 0m;
 
     [Column("bank_date", TypeName = "date")]
     public DateTime? ClearedDate { get; set; }

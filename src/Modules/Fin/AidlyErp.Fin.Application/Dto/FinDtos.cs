@@ -106,6 +106,18 @@ public class Fin1003VoucherTypeDto
     [JsonPropertyName("prefix")]
     public string? Prefix { get; set; }
 
+    [JsonPropertyName("default_dr_account_no")]
+    public long? DefaultDrAccountNo { get; set; }
+
+    [JsonPropertyName("default_cr_account_no")]
+    public long? DefaultCrAccountNo { get; set; }
+
+    [JsonPropertyName("is_system")]
+    public short IsSystem { get; set; } = 0;
+
+    [JsonPropertyName("order_sl")]
+    public int OrderSl { get; set; } = 0;
+
     [JsonPropertyName("requires_approval")]
     public short RequiresApproval { get; set; } = 0;
 
@@ -150,6 +162,9 @@ public class Fin1004OpeningLineDto
 
     [JsonPropertyName("opening_dr_cr")]
     public string OpeningDrCr { get; set; } = "dr";
+
+    [JsonPropertyName("line_narration")]
+    public string? LineNarration { get; set; }
 }
 
 public class Fin1004OpeningBalanceDto
@@ -184,6 +199,9 @@ public class Fin1005BankAccountDto
     [JsonPropertyName("bank_account_no")]
     public long? BankAccountNo { get; set; }
 
+    [JsonPropertyName("bank_account_id")]
+    public string? BankAccountId { get; set; }
+
     [JsonPropertyName("account_no")]
     public long AccountNo { get; set; }
 
@@ -196,6 +214,12 @@ public class Fin1005BankAccountDto
     [JsonPropertyName("account_number")]
     public string? AccountNumber { get; set; }
 
+    [JsonPropertyName("account_title")]
+    public string? AccountTitle { get; set; }
+
+    [JsonPropertyName("routing_number")]
+    public string? RoutingNumber { get; set; }
+
     [JsonPropertyName("swift_code")]
     public string? SwiftCode { get; set; }
 
@@ -204,6 +228,9 @@ public class Fin1005BankAccountDto
 
     [JsonPropertyName("currency_no")]
     public long? CurrencyNo { get; set; }
+
+    [JsonPropertyName("opening_balance")]
+    public decimal OpeningBalance { get; set; }
 
     [JsonPropertyName("branch_no")]
     public long? BranchNo { get; set; }
@@ -288,6 +315,12 @@ public class Fin1101VoucherLineDto
 
     [JsonPropertyName("against_voucher_no")]
     public long? AgainstVoucherNo { get; set; }
+
+    [JsonPropertyName("vat_tax_no")]
+    public long? VatTaxNo { get; set; }
+
+    [JsonPropertyName("tax_rate_pct")]
+    public decimal? TaxRatePct { get; set; }
 
     [JsonPropertyName("line_narration")]
     public string? LineNarration { get; set; }
@@ -485,6 +518,15 @@ public class Fin1102ReconDto
     public string? Remarks { get; set; }
 }
 
+public class Fin1102ClearedLineDto
+{
+    [JsonPropertyName("ledger_no")]
+    public long LedgerNo { get; set; }
+
+    [JsonPropertyName("bank_date")]
+    public DateTime? BankDate { get; set; }
+}
+
 public class Fin1102SaveDto
 {
     [JsonPropertyName("account_no")]
@@ -499,8 +541,14 @@ public class Fin1102SaveDto
     [JsonPropertyName("remarks")]
     public string? Remarks { get; set; }
 
+    [JsonPropertyName("narration")]
+    public string? Narration { get; set; }
+
     [JsonPropertyName("cleared_ledger_nos")]
-    public List<long> ClearedLedgerNos { get; set; } = new();
+    public List<long>? ClearedLedgerNos { get; set; }
+
+    [JsonPropertyName("cleared_lines")]
+    public List<Fin1102ClearedLineDto>? ClearedLines { get; set; }
 }
 
 public class Fin1201EventDto
@@ -552,6 +600,9 @@ public class FinStatementRowDto
 
     [JsonPropertyName("closing_balance")]
     public decimal ClosingBalance { get; set; }
+
+    [JsonPropertyName("amount")]
+    public decimal Amount { get; set; }
 }
 
 public class Fin1301TrialBalanceRowDto : FinStatementRowDto { }
@@ -680,6 +731,12 @@ public class Fin1305BalanceSheetDto
 
     [JsonPropertyName("retained_earnings")]
     public decimal RetainedEarnings { get; set; }
+
+    [JsonPropertyName("is_balanced")]
+    public bool IsBalanced { get; set; }
+
+    [JsonPropertyName("warning")]
+    public string? Warning { get; set; }
 }
 
 /// <summary>One cash/bank account line of the cash-flow statement.</summary>
@@ -806,6 +863,12 @@ public class Fin1401PeriodDto
     [JsonPropertyName("fin_period_no")]
     public long FinPeriodNo { get; set; }
 
+    [JsonPropertyName("fin_year_no")]
+    public long FinYearNo { get; set; }
+
+    [JsonPropertyName("fin_period_id")]
+    public string? FinPeriodId { get; set; }
+
     [JsonPropertyName("period_name")]
     public string? PeriodName { get; set; }
 
@@ -814,6 +877,9 @@ public class Fin1401PeriodDto
 
     [JsonPropertyName("end_date")]
     public DateTime EndDate { get; set; }
+
+    [JsonPropertyName("period_status")]
+    public short PeriodStatus { get; set; }
 
     [JsonPropertyName("is_closed")]
     public short IsClosed { get; set; }

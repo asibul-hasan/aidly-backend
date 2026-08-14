@@ -87,7 +87,7 @@ public class Hrm1205Service : IHrm1205Service
             PercentageOfBasic = NonNeg(dto.PercentageOfBasic, "Percentage"),
             FixedAmount = NonNeg(dto.FixedAmount, "Fixed amount"),
             Status = StDraft,
-            IsActive = NormalizeFlag(dto.IsActive, 1, "is_active"),
+            IsActive = NormalizeFlag(dto.IsActive ?? 0, 1, "is_active"),
             IsDeleted = 0,
             CreatedBy = _ctx.CurrentUserNo(),
             CreatedAt = DateTime.UtcNow
@@ -116,7 +116,7 @@ public class Hrm1205Service : IHrm1205Service
         if (dto.ApplicabilityType != null) entity.ApplicabilityType = NormalizeApplicabilityType(dto.ApplicabilityType);
         if (dto.PercentageOfBasic != null) entity.PercentageOfBasic = NonNeg(dto.PercentageOfBasic, "Percentage");
         if (dto.FixedAmount != null) entity.FixedAmount = NonNeg(dto.FixedAmount, "Fixed amount");
-        if (dto.IsActive != null) entity.IsActive = NormalizeFlag(dto.IsActive, 1, "is_active");
+        if (dto.IsActive != null) entity.IsActive = NormalizeFlag(dto.IsActive ?? 0, 1, "is_active");
 
         entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);

@@ -88,8 +88,14 @@ public class FinAccountGroup : AuditEntity
     [Column("order_sl")]
     public int DisplayOrder { get; set; } = 0;
 
+    [Column("is_control")]
+    public short IsControl { get; set; } = 0;
+
     [Column("company_no")]
     public long CompanyNo { get; set; }
+
+    [Column("branch_no")]
+    public long? BranchNo { get; set; }
 }
 
 [Table("fin_account_balance")]

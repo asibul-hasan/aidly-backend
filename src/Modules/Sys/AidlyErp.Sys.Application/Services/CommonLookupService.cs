@@ -90,7 +90,7 @@ public class CommonLookupService : ICommonLookupService
 
         var empNos = employees.Select(e => e.EmployeeNo).ToList();
         var userMap = await _db.Users.AsNoTracking()
-            .Where(u => empNos.Contains(u.EmployeeNo) && u.IsDeleted == 0)
+            .Where(u => u.EmployeeNo != null && empNos.Contains(u.EmployeeNo.Value) && u.IsDeleted == 0)
             .ToDictionaryAsync(u => u.EmployeeNo, u => u.UserNo, ct);
 
         foreach (var emp in employees)

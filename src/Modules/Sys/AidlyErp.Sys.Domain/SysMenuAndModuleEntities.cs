@@ -18,11 +18,11 @@ public class Menu : AuditEntity
     /// </summary>
     [Column("form_id")]
     [StringLength(50)]
-    public string FormId { get; set; } = string.Empty;
+    public string? FormId { get; set; }
 
     [Column("form_name")]
     [StringLength(100)]
-    public string FormName { get; set; } = string.Empty;
+    public string? FormName { get; set; }
 
     [Column("menu_desc")]
     public string? MenuDesc { get; set; }
@@ -52,7 +52,7 @@ public class Menu : AuditEntity
     /// store <c>module_no</c> on the menu row.
     /// </summary>
     [Column("submodule_no")]
-    public long SubmoduleNo { get; set; }
+    public long? SubmoduleNo { get; set; }
 
     // --- Aliases for callers using the older .NET names ---
 
@@ -85,7 +85,7 @@ public class EnrollMenu : AuditEntity
     public long EnrollMenuNo { get; set; }
 
     [Column("company_no")]
-    public long CompanyNo { get; set; }
+    public long? CompanyNo { get; set; }
 
     [Column("branch_no")]
     public long? BranchNo { get; set; }

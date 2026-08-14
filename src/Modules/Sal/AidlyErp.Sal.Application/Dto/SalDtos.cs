@@ -7,14 +7,14 @@ public class Sal1001LineDto
     [JsonPropertyName("invoice_dtl_no")]
     public long? InvoiceDtlNo { get; set; }
 
-    [JsonPropertyName("item_no")]
-    public long ItemNo { get; set; }
+    [JsonPropertyName("product_no")]
+    public long ProductNo { get; set; }
 
-    [JsonPropertyName("item_code")]
-    public string? ItemCode { get; set; }
+    [JsonPropertyName("product_code")]
+    public string? ProductCode { get; set; }
 
-    [JsonPropertyName("item_name")]
-    public string? ItemName { get; set; }
+    [JsonPropertyName("product_name")]
+    public string? ProductName { get; set; }
 
     [JsonPropertyName("uom_no")]
     public long? UomNo { get; set; }
@@ -22,8 +22,20 @@ public class Sal1001LineDto
     [JsonPropertyName("uom_code")]
     public string? UomCode { get; set; }
 
-    [JsonPropertyName("quantity")]
-    public decimal Quantity { get; set; }
+    [JsonPropertyName("uom_name")]
+    public string? UomName { get; set; }
+
+    [JsonPropertyName("line_no")]
+    public int LineNo { get; set; }
+
+    [JsonPropertyName("qty")]
+    public decimal Qty { get; set; }
+
+    [JsonPropertyName("qty_base")]
+    public decimal QtyBase { get; set; }
+
+    [JsonPropertyName("batch_code")]
+    public string? BatchCode { get; set; }
 
     [JsonPropertyName("unit_price")]
     public decimal UnitPrice { get; set; }
@@ -34,17 +46,17 @@ public class Sal1001LineDto
     [JsonPropertyName("line_total")]
     public decimal LineTotal { get; set; }
 
-    [JsonPropertyName("discount_percent")]
-    public decimal DiscountPercent { get; set; }
+    [JsonPropertyName("line_discount_pct")]
+    public decimal LineDiscountPct { get; set; }
 
-    [JsonPropertyName("discount_amount")]
-    public decimal DiscountAmount { get; set; }
+    [JsonPropertyName("line_discount_amount")]
+    public decimal LineDiscountAmount { get; set; }
 
     [JsonPropertyName("taxable_amount")]
     public decimal TaxableAmount { get; set; }
 
-    [JsonPropertyName("tax_percent")]
-    public decimal TaxPercent { get; set; }
+    [JsonPropertyName("tax_rate_pct")]
+    public decimal TaxRatePct { get; set; }
 
     [JsonPropertyName("tax_amount")]
     public decimal TaxAmount { get; set; }
@@ -127,6 +139,12 @@ public class Sal1001InvoiceDto
     [JsonPropertyName("fin_year_no")]
     public long? FinYearNo { get; set; }
 
+
+    /// <summary>The GL voucher the posting engine produced for this invoice, once it has drained
+    /// the outbox. Null until then — posting is asynchronous, so an empty value means "not yet",
+    /// not "failed".</summary>
+    [JsonPropertyName("gl_voucher_no")]
+    public string? GlVoucherNo { get; set; }
     [JsonPropertyName("approval_request_no")]
     public long? ApprovalRequestNo { get; set; }
 
@@ -143,16 +161,35 @@ public class Sal1001InvoiceDto
     public List<Sal1001LineDto> Lines { get; set; } = new();
 }
 
+/// <summary>A selectable option. Field names match what the Angular SAL forms bind to
+/// (`SalOption { no, name }` in features/sal/forms/sal1001/services/data.service.ts).</summary>
+public class SalOptionDto
+{
+    [JsonPropertyName("no")]
+    public long No { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+}
+
 public class Sal1001LookupDto
 {
     [JsonPropertyName("customers")]
-    public List<object> Customers { get; set; } = new();
+    public List<SalOptionDto> Customers { get; set; } = new();
 
     [JsonPropertyName("warehouses")]
-    public List<object> Warehouses { get; set; } = new();
+    public List<SalOptionDto> Warehouses { get; set; } = new();
 
+    [JsonPropertyName("products")]
+    public List<SalOptionDto> Products { get; set; } = new();
+
+    [JsonPropertyName("uoms")]
+    public List<SalOptionDto> Uoms { get; set; } = new();
+
+    /// <summary>Legacy alias for <see cref="Products"/> — kept so any caller still
+    /// reading `items` keeps working. Serialised, never deserialised into.</summary>
     [JsonPropertyName("items")]
-    public List<object> Items { get; set; } = new();
+    public List<SalOptionDto> Items => Products;
 }
 
 public class Sal1101CustomerDto
@@ -193,6 +230,10 @@ public class Sal1101CustomerDto
     [JsonPropertyName("tax_number")]
     public string? TaxNumber { get; set; }
 
+    /// <summary>1 = may buy on credit. A credit limit means nothing without it.</summary>
+    [JsonPropertyName("is_credit_allowed")]
+    public short IsCreditAllowed { get; set; }
+
     [JsonPropertyName("credit_limit")]
     public decimal CreditLimit { get; set; }
 
@@ -220,8 +261,8 @@ public class Sal1101CustomerDto
 
 public class Sal1102AllocDto
 {
-    [JsonPropertyName("alloc_no")]
-    public long? AllocNo { get; set; }
+    [JsonPropertyName("receipt_alloc_no")]
+    public long? ReceiptAllocNo { get; set; }
 
     [JsonPropertyName("receipt_no")]
     public long? ReceiptNo { get; set; }
@@ -231,6 +272,11 @@ public class Sal1102AllocDto
 
     [JsonPropertyName("invoice_id")]
     public string? InvoiceId { get; set; }
+
+    /// <summary>What is still outstanding on that invoice. Allocating a receipt without it means
+    /// typing an amount blind.</summary>
+    [JsonPropertyName("invoice_due")]
+    public decimal InvoiceDue { get; set; }
 
     [JsonPropertyName("allocated_amount")]
     public decimal AllocatedAmount { get; set; }
@@ -319,23 +365,51 @@ public class Sal1103LineDto
     [JsonPropertyName("return_dtl_no")]
     public long? ReturnDtlNo { get; set; }
 
-    [JsonPropertyName("item_no")]
-    public long ItemNo { get; set; }
+    [JsonPropertyName("product_no")]
+    public long ProductNo { get; set; }
 
-    [JsonPropertyName("item_code")]
-    public string? ItemCode { get; set; }
+    [JsonPropertyName("product_code")]
+    public string? ProductCode { get; set; }
 
-    [JsonPropertyName("item_name")]
-    public string? ItemName { get; set; }
+    [JsonPropertyName("product_name")]
+    public string? ProductName { get; set; }
 
     [JsonPropertyName("uom_no")]
     public long? UomNo { get; set; }
 
-    [JsonPropertyName("quantity")]
-    public decimal Quantity { get; set; }
+    [JsonPropertyName("uom_name")]
+    public string? UomName { get; set; }
+
+    [JsonPropertyName("line_no")]
+    public int LineNo { get; set; }
+
+    [JsonPropertyName("qty")]
+    public decimal Qty { get; set; }
+
+    [JsonPropertyName("qty_base")]
+    public decimal QtyBase { get; set; }
+
+    [JsonPropertyName("batch_code")]
+    public string? BatchCode { get; set; }
 
     [JsonPropertyName("unit_price")]
     public decimal UnitPrice { get; set; }
+
+    /// <summary>Price actually credited back, which is not the original selling price when the
+    /// return is partial-value or a restocking deduction applies.</summary>
+    [JsonPropertyName("net_unit_price")]
+    public decimal NetUnitPrice { get; set; }
+
+    [JsonPropertyName("tax_rate_pct")]
+    public decimal TaxRatePct { get; set; }
+
+    [JsonPropertyName("tax_amount")]
+    public decimal TaxAmount { get; set; }
+
+    /// <summary>1 = goods come back into stock, 0 = written off (damaged, expired).
+    /// The user's call, not a default — it decides whether stock moves at all.</summary>
+    [JsonPropertyName("restock_flag")]
+    public short RestockFlag { get; set; } = 1;
 
     [JsonPropertyName("unit_cost")]
     public decimal UnitCost { get; set; }
@@ -376,6 +450,9 @@ public class Sal1103ReturnDto
     [JsonPropertyName("warehouse_name")]
     public string? WarehouseName { get; set; }
 
+    [JsonPropertyName("sub_total")]
+    public decimal SubTotal { get; set; }
+
     [JsonPropertyName("total_amount")]
     public decimal TotalAmount { get; set; }
 
@@ -385,8 +462,21 @@ public class Sal1103ReturnDto
     [JsonPropertyName("grand_total")]
     public decimal GrandTotal { get; set; }
 
+    [JsonPropertyName("total_cost")]
+    public decimal TotalCost { get; set; }
+
     [JsonPropertyName("status")]
     public short Status { get; set; } = 1; // 1=Draft 2=Posted 3=Cancelled
+
+    /// <summary>1=Defective 2=WrongItem 3=Expired 4=CustomerChange 5=Other. A code, not free text —
+    /// return reasons are reported on, so they have to be countable.</summary>
+    [JsonPropertyName("return_reason")]
+    public short? ReturnReason { get; set; }
+
+    /// <summary>1=Cash 2=Card 3=Mobile 4=Bank 5=StoreCredit 6=AgainstDue. Decides which GL leg the
+    /// refund lands on, so it cannot be left to a default.</summary>
+    [JsonPropertyName("refund_method")]
+    public short RefundMethod { get; set; } = 1;
 
     [JsonPropertyName("reason")]
     public string? Reason { get; set; }

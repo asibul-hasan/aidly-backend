@@ -36,7 +36,7 @@ public class HrmLeaveApplication : AuditEntity, IBranchScopedEntity, IEmployeeOw
     public decimal TotalDays { get; set; }
 
     [Column("is_half_day")]
-    public short IsHalfDay { get; set; } = 0;
+    public short? IsHalfDay { get; set; } = 0;
 
     [Column("leave_year")]
     public int LeaveYear { get; set; }

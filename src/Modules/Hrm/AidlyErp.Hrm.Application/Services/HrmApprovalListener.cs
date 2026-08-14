@@ -2,6 +2,7 @@ using AidlyErp.Shared.Core.Abstractions;
 using AidlyErp.Shared.Contracts;
 using AidlyErp.Sys.Contracts;
 using AidlyErp.Hrm.Application.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AidlyErp.Hrm.Application.Services;
 
@@ -12,19 +13,20 @@ namespace AidlyErp.Hrm.Application.Services;
 /// </summary>
 public class HrmApprovalListener : IApprovalCompletedListener
 {
-    private readonly IHrm1202Service _payrollService;
-    private readonly IHrm1301Service _leaveService;
-    private readonly IHrm1206Service _loanService;
+    // Resolved at callback time, not injected — all three of these services take IApprovalService,
+    // and ApprovalService takes IEnumerable<IApprovalCompletedListener>, so constructor injection
+    // here is a dependency cycle the container cannot build. See FinApprovalListener for the full
+    // account; the same defect was live in both listeners. The provider is the request scope, so
+    // the resolved service shares the engine's DbContext and transaction.
+    private readonly IServiceProvider _services;
 
-    public HrmApprovalListener(
-        IHrm1202Service payrollService,
-        IHrm1301Service leaveService,
-        IHrm1206Service loanService)
+    public HrmApprovalListener(IServiceProvider services)
     {
-        _payrollService = payrollService;
-        _leaveService = leaveService;
-        _loanService = loanService;
+        _services = services;
     }
+
+    private IHrm1202Service PayrollService => _services.GetRequiredService<IHrm1202Service>();
+    private IHrm1301Service LeaveService => _services.GetRequiredService<IHrm1301Service>();
 
     /// <summary>
     /// Dispatches approval outcome to the correct HRM service based on document type.
@@ -37,11 +39,11 @@ public class HrmApprovalListener : IApprovalCompletedListener
         switch (documentType)
         {
             case "HRM_PAYROLL":
-                await _payrollService.ApplyApprovalOutcomeAsync(documentNo, approved, ct);
+                await PayrollService.ApplyApprovalOutcomeAsync(documentNo, approved, ct);
                 break;
             case "HRM_1301":
             case "HRM_LEAVE":
-                await _leaveService.ApplyApprovalOutcomeAsync(documentNo, approved, ct);
+                await LeaveService.ApplyApprovalOutcomeAsync(documentNo, approved, ct);
                 break;
             case "HRM_LOAN":
                 // Loan approval is handled inline in Hrm1206Service via IApprovalService.
@@ -57,6 +59,6 @@ public class HrmApprovalListener : IApprovalCompletedListener
     /// </summary>
     public async Task OnApprovalCompletedAsync(long payrollRunNo, bool approved, CancellationToken ct = default)
     {
-        await _payrollService.ApplyApprovalOutcomeAsync(payrollRunNo, approved, ct);
+        await PayrollService.ApplyApprovalOutcomeAsync(payrollRunNo, approved, ct);
     }
 }

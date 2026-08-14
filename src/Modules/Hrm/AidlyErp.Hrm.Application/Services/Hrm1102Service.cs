@@ -172,9 +172,9 @@ public class Hrm1102Service : IHrm1102Service
         InTime = a.InTime,
         OutTime = a.OutTime,
         Status = a.Status,
-        LateMinutes = a.LateMinutes,
-        WorkedHours = a.WorkedHours,
-        Source = a.Source,
+        LateMinutes = a.LateMinutes ?? 0,
+        WorkedHours = a.WorkedHours ?? 0m,
+        Source = a.Source ?? 0,
         IsLocked = a.IsLocked
     };
 }

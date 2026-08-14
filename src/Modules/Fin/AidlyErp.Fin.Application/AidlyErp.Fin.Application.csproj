@@ -12,6 +12,10 @@
     <ProjectReference Include="..\..\..\Shared\AidlyErp.Shared.Core\AidlyErp.Shared.Core.csproj" />
     <ProjectReference Include="..\..\..\Shared\AidlyErp.Shared.Contracts\AidlyErp.Shared.Contracts.csproj" />
     <ProjectReference Include="..\..\Sys\AidlyErp.Sys.Contracts\AidlyErp.Sys.Contracts.csproj" />
+    <!-- FIN_1202/1203 reconcile the GL control accounts against the sub-ledgers PUR and SAL own.
+         Contracts only — the ledger tables themselves stay behind their modules. -->
+    <ProjectReference Include="..\..\Pur\AidlyErp.Pur.Contracts\AidlyErp.Pur.Contracts.csproj" />
+    <ProjectReference Include="..\..\Sal\AidlyErp.Sal.Contracts\AidlyErp.Sal.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,6 +25,8 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.10" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+    <PackageReference Include="QuestPDF" Version="2024.12.2" />
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
   </ItemGroup>
 
 </Project>

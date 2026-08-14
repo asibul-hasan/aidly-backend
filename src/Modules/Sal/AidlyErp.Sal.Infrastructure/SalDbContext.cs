@@ -1,5 +1,6 @@
 using AidlyErp.Sal.Application.Interfaces;
 using AidlyErp.Sal.Domain;
+using AidlyErp.Sys.Domain;
 using AidlyErp.Shared.Core.Security;
 using AidlyErp.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,14 @@ public class SalDbContext : ModuleDbContext, ISalDbContext
     public DbSet<SalReceiptAlloc> SalReceiptAllocs => Set<SalReceiptAlloc>();
     public DbSet<SalReturn> SalReturns => Set<SalReturn>();
     public DbSet<SalReturnDtl> SalReturnDtls => Set<SalReturnDtl>();
+    public DbSet<SalPosTerminal> SalPosTerminals => Set<SalPosTerminal>();
+    public DbSet<SalPosSession> SalPosSessions => Set<SalPosSession>();
+    public DbSet<SalInvoicePayment> SalInvoicePayments => Set<SalInvoicePayment>();
+    public DbSet<SalCustomerGroup> SalCustomerGroups => Set<SalCustomerGroup>();
+    public DbSet<SalPromotion> SalPromotions => Set<SalPromotion>();
+    public DbSet<SalPromotionDtl> SalPromotionDtls => Set<SalPromotionDtl>();
+
+    public DbSet<VatTax> VatTaxes => Set<VatTax>();
 
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {

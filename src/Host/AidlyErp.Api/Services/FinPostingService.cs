@@ -7,9 +7,8 @@ namespace AidlyErp.Api.Services;
 
 /// <summary>
 /// Background outbox drain — periodically calls <see cref="IFinPostingService.DrainOnceAsync"/>
-/// to process pending <c>sys_event_outbox</c> rows. Delegates all business logic (voucher
-/// creation, ledger posting, balance updates) to the application-layer service which runs
-/// inside a proper DI scope with tenant context.
+/// to process pending <c>sys_event_outbox</c> rows. Tenant context is set per-event inside
+/// the application layer, not here.
 /// </summary>
 public class FinPostingBackgroundService : BackgroundService
 {

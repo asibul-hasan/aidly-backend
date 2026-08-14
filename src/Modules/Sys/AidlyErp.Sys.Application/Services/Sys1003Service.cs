@@ -212,7 +212,7 @@ public class Sys1003Service : ISys1003Service
     {
         var entity = await LoadLiveAsync(finYearNo, ct);
 
-        var companyNo = entity.CompanyNo;
+        var companyNo = entity.CompanyNo ?? 0;
         var branchNo = entity.BranchNo; // branch is immutable once a year is opened
 
         var startDate = dto.StartDate ?? entity.StartDate;

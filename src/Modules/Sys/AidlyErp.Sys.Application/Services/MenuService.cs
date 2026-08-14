@@ -130,7 +130,7 @@ public class MenuService : IMenuService
 
         return (await _db.Menus
                 .AsNoTracking()
-                .Where(m => submoduleNos.Contains(m.SubmoduleNo) && m.IsDeleted == Deleted)
+                .Where(m => m.SubmoduleNo != null && submoduleNos.Contains(m.SubmoduleNo.Value) && m.IsDeleted == Deleted)
                 .ToListAsync(cancellationToken))
             .Select(ToDto).ToList();
     }

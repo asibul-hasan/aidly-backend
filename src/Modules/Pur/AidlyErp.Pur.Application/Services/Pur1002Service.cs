@@ -38,18 +38,36 @@ public class Pur1002Service : IPur1002Service
     public async Task<List<Pur1002PriceRowDto>> GetRowsAsync(long supplierNo, CancellationToken ct = default)
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context is required");
-        await RequireSupplierAsync(supplierNo, companyNo, ct);
+        var supplier = await RequireSupplierAsync(supplierNo, companyNo, ct);
 
-        return await _db.PurSupplierProducts.AsNoTracking()
+        var rows = await _db.PurSupplierProducts.AsNoTracking()
             .Where(p => p.SupplierNo == supplierNo && p.IsDeleted == 0)
             .OrderBy(p => p.SupProdNo)
-            .Select(p => new Pur1002PriceRowDto
-            {
-                SupplierNo = p.SupplierNo,
-                ProductNo = p.ProductNo,
-                UnitPrice = p.LastPurchasePrice ?? 0m
-            })
             .ToListAsync(ct);
+
+        var productNos = rows.Select(r => r.ProductNo).Distinct().ToList();
+        var products = await _catalog.GetProductNamesAsync(productNos, ct);
+
+        return rows.Select(p => new Pur1002PriceRowDto
+        {
+            SupplierProductNo = p.SupProdNo,
+            SupplierNo = p.SupplierNo,
+            SupplierName = supplier.SupplierName,
+            ProductNo = p.ProductNo,
+            ProductName = products.GetValueOrDefault(p.ProductNo),
+            VariantNo = p.VariantNo,
+            UomNo = p.UomNo,
+            SupplierSku = p.SupplierSku,
+            LastPrice = p.LastPrice,
+            DiscountPct = p.DiscountPct,
+            Moq = p.Moq,
+            LeadTimeDays = p.LeadTimeDays,
+            IsPreferred = p.IsPreferred,
+            UnitPrice = p.LastPrice,
+            Remarks = p.Remarks,
+            IsActive = p.IsActive ?? 0,
+            RowVersion = p.RowVersion
+        }).ToList();
     }
 
     public async Task<List<Pur1002PriceRowDto>> SaveRowsAsync(long supplierNo, List<Pur1002PriceRowDto> rows, CancellationToken ct = default)
@@ -65,27 +83,28 @@ public class Pur1002Service : IPur1002Service
             .Where(p => p.SupplierNo == supplierNo && p.IsDeleted == 0)
             .ToListAsync(ct);
 
-        // Build a lookup by ProductNo for update matching.
-        var existingByProduct = existing.ToDictionary(p => p.ProductNo);
+        // A supplier may quote the same product in several UOMs (piece and carton), so a row is
+        // identified by product + variant + UOM — keying on product alone collapses those.
+        var existingByKey = new Dictionary<(long, long, long), PurSupplierProduct>();
+        foreach (var p in existing) existingByKey.TryAdd(RowKey(p.ProductNo, p.VariantNo, p.UomNo), p);
+
+        var live = rows.Where(r => r.ProductNo > 0).ToList();
+        var products = await _catalog.GetProductsAsync(live.Select(r => r.ProductNo).Distinct().ToList(),
+                                                       companyNo, ct);
 
         var kept = new HashSet<long>();
-        foreach (var dto in rows)
+        foreach (var dto in live)
         {
-            if (dto.ProductNo <= 0) continue;
-
-            // Validate product exists.
-            var product = await _catalog.FindProductAsync(dto.ProductNo, companyNo, ct)
-                ?? throw new NotFoundException($"Product not found: {dto.ProductNo}");
+            if (!products.ContainsKey(dto.ProductNo))
+                throw new NotFoundException($"Product not found: {dto.ProductNo}");
 
             PurSupplierProduct row;
-            if (existingByProduct.TryGetValue(dto.ProductNo, out var existingRow))
+            if (existingByKey.TryGetValue(RowKey(dto.ProductNo, dto.VariantNo, dto.UomNo), out var existingRow))
             {
-                // Update existing row.
                 row = existingRow;
             }
             else
             {
-                // Create new row.
                 row = new PurSupplierProduct
                 {
                     SupplierNo = supplierNo,
@@ -97,10 +116,20 @@ public class Pur1002Service : IPur1002Service
                 _db.PurSupplierProducts.Add(row);
             }
 
-            row.LastPurchasePrice = dto.UnitPrice;
+            row.VariantNo = dto.VariantNo;
+            row.UomNo = dto.UomNo;
+            row.SupplierSku = dto.SupplierSku;
+            row.LastPrice = dto.LastPrice > 0 ? dto.LastPrice : dto.UnitPrice;
+            row.DiscountPct = dto.DiscountPct;
+            row.Moq = dto.Moq;
+            row.LeadTimeDays = dto.LeadTimeDays;
+            row.IsPreferred = dto.IsPreferred;
+            row.Remarks = dto.Remarks;
+            row.IsActive = dto.IsActive > 0 ? dto.IsActive : (short)1;
             row.UpdatedBy = _ctx.CurrentUserNo();
             row.UpdatedAt = DateTime.UtcNow;
 
+            // New rows need their PK before they can be marked as kept.
             await _db.SaveChangesAsync(ct);
             kept.Add(row.SupProdNo);
         }
@@ -135,7 +164,7 @@ public class Pur1002Service : IPur1002Service
         await _db.SaveChangesAsync(ct);
     }
 
-    private async Task RequireSupplierAsync(long supplierNo, long companyNo, CancellationToken ct)
+    private async Task<PurSupplier> RequireSupplierAsync(long supplierNo, long companyNo, CancellationToken ct)
     {
         var supplier = await _db.PurSuppliers.AsNoTracking()
             .FirstOrDefaultAsync(s => s.SupplierNo == supplierNo && s.IsDeleted == 0, ct)
@@ -143,16 +172,21 @@ public class Pur1002Service : IPur1002Service
 
         if (supplier.CompanyNo != companyNo)
             throw new ValidationException("Supplier belongs to another company");
+        return supplier;
     }
+
+    /// <summary>Identity of a price row: the same product may appear once per variant and UOM.</summary>
+    private static (long, long, long) RowKey(long productNo, long? variantNo, long? uomNo) =>
+        (productNo, variantNo ?? 0, uomNo ?? 0);
 
     private static void AssertNoDuplicateRows(List<Pur1002PriceRowDto> rows)
     {
-        var seen = new HashSet<long>();
+        var seen = new HashSet<(long, long, long)>();
         foreach (var row in rows)
         {
-            if (row.ProductNo <= 0) continue;
-            if (!seen.Add(row.ProductNo))
-                throw new ValidationException($"Duplicate product in supplier price list: productNo={row.ProductNo}");
+            if (row.ProductNo <= 0 || row.UomNo <= 0) continue;
+            if (!seen.Add(RowKey(row.ProductNo, row.VariantNo, row.UomNo)))
+                throw new ValidationException("Duplicate product/UOM row in supplier price list");
         }
     }
 }

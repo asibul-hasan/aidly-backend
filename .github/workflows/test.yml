@@ -1,0 +1,42 @@
+name: .NET Backend Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sme-dotnet-backend/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sme-dotnet-backend/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: sme-dotnet-backend
+      
+      - name: Build
+        run: dotnet build --no-restore
+        working-directory: sme-dotnet-backend
+      
+      - name: Run unit tests
+        run: dotnet test --no-build --verbosity normal --filter "FullyQualifiedName!~SchemaDriftTests"
+        working-directory: sme-dotnet-backend
+
+      - name: Run SchemaDriftTests (blocking)
+        env:
+          AIDLY_CONNECTION: ${{ secrets.AIDLY_CONNECTION_STRING }}
+        run: dotnet test --no-build --verbosity normal --filter "FullyQualifiedName~SchemaDriftTests"
+        working-directory: sme-dotnet-backend

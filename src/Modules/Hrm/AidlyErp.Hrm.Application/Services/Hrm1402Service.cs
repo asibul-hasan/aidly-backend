@@ -87,7 +87,7 @@ public class Hrm1402Service : IHrm1402Service
             ApplicationStatus = ValidateStatus(dto.ApplicationStatus, 1),
             ResumeFileNo = dto.ResumeFileNo,
             Remarks = dto.Remarks,
-            IsActive = NormalizeFlag(dto.IsActive, 1, "is_active"),
+            IsActive = NormalizeFlag((short)(dto.IsActive ?? 1), 1, "is_active"),
             IsDeleted = 0,
             CreatedBy = _ctx.CurrentUserNo(),
             CreatedAt = DateTime.UtcNow
@@ -116,7 +116,7 @@ public class Hrm1402Service : IHrm1402Service
         if (dto.ApplicationStatus != 0) entity.ApplicationStatus = ValidateStatus(dto.ApplicationStatus, entity.ApplicationStatus);
         if (dto.ResumeFileNo != null) entity.ResumeFileNo = dto.ResumeFileNo;
         if (dto.Remarks != null) entity.Remarks = dto.Remarks;
-        if (dto.IsActive != 0) entity.IsActive = NormalizeFlag(dto.IsActive, 1, "is_active");
+        if (dto.IsActive != null) entity.IsActive = NormalizeFlag(dto.IsActive.Value, 1, "is_active");
 
         entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);

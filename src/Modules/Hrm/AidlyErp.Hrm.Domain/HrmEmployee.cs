@@ -206,7 +206,7 @@ public class HrmEmployee : AuditEntity, IBranchScopedEntity, IEmployeeOwnedEntit
     public string? EducationSubject { get; set; }
 
     [Column("is_experienced")]
-    public short IsExperienced { get; set; } = 0;
+    public short? IsExperienced { get; set; } = 0;
 
     [Column("experience_duration")]
     [StringLength(100)]
@@ -275,11 +275,11 @@ public class HrmEmployee : AuditEntity, IBranchScopedEntity, IEmployeeOwnedEntit
 
     /// <summary>Employment status — mirrors <c>is_active</c> (1 = in service, 0 = not).</summary>
     [NotMapped]
-    public short Status { get => IsActive; set => IsActive = value; }
+    public short? Status { get => IsActive; set => IsActive = value; }
 
     /// <summary>Alias for <see cref="Status"/>; the Java field for this concept is <c>is_active</c>.</summary>
     [NotMapped]
-    public short EmploymentStatus { get => IsActive; set => IsActive = value; }
+    public short? EmploymentStatus { get => IsActive; set => IsActive = value; }
 
     protected override void NullifyBusinessId()
     {

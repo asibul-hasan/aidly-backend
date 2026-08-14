@@ -93,13 +93,13 @@ public class Hrm1101Service : IHrm1101Service
             InTime = dto.InTime,
             OutTime = dto.OutTime,
             Status = status,
-            LateMinutes = NonNegativeInt(dto.LateMinutes, "Late minutes"),
-            EarlyOutMinutes = NonNegativeInt(dto.EarlyOutMinutes, "Early-out minutes"),
-            WorkedHours = NonNegativeDecimal(dto.WorkedHours, "Worked hours"),
-            OtHours = NonNegativeDecimal(dto.OtHours, "OT hours"),
+            LateMinutes = NonNegativeInt(dto.LateMinutes ?? 0, "Late minutes"),
+            EarlyOutMinutes = NonNegativeInt(dto.EarlyOutMinutes ?? 0, "Early-out minutes"),
+            WorkedHours = NonNegativeDecimal(dto.WorkedHours ?? 0m, "Worked hours"),
+            OtHours = NonNegativeDecimal(dto.OtHours ?? 0m, "OT hours"),
             Source = SrcManual,
             IsLocked = 0,
-            IsActive = NormalizeFlag(dto.IsActive, 1, "is_active"),
+            IsActive = NormalizeFlag((short)(dto.IsActive ?? 1), 1, "is_active"),
             IsDeleted = 0,
             CreatedBy = _ctx.CurrentUserNo(),
             CreatedAt = DateTime.UtcNow
@@ -119,12 +119,12 @@ public class Hrm1101Service : IHrm1101Service
         if (dto.ShiftNo != null) entity.ShiftNo = dto.ShiftNo;
         if (dto.InTime != null) entity.InTime = dto.InTime;
         if (dto.OutTime != null) entity.OutTime = dto.OutTime;
-        if (dto.LateMinutes != 0) entity.LateMinutes = NonNegativeInt(dto.LateMinutes, "Late minutes");
-        if (dto.EarlyOutMinutes != 0) entity.EarlyOutMinutes = NonNegativeInt(dto.EarlyOutMinutes, "Early-out minutes");
-        if (dto.WorkedHours != 0) entity.WorkedHours = NonNegativeDecimal(dto.WorkedHours, "Worked hours");
-        if (dto.OtHours != 0) entity.OtHours = NonNegativeDecimal(dto.OtHours, "OT hours");
+        if (dto.LateMinutes != null) entity.LateMinutes = NonNegativeInt(dto.LateMinutes.Value, "Late minutes");
+        if (dto.EarlyOutMinutes != null) entity.EarlyOutMinutes = NonNegativeInt(dto.EarlyOutMinutes.Value, "Early-out minutes");
+        if (dto.WorkedHours != null) entity.WorkedHours = NonNegativeDecimal(dto.WorkedHours.Value, "Worked hours");
+        if (dto.OtHours != null) entity.OtHours = NonNegativeDecimal(dto.OtHours.Value, "OT hours");
         entity.Source = SrcManual;
-        if (dto.IsActive != 0) entity.IsActive = NormalizeFlag(dto.IsActive, 1, "is_active");
+        if (dto.IsActive != null) entity.IsActive = NormalizeFlag(dto.IsActive.Value, 1, "is_active");
 
         entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);

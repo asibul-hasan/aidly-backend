@@ -46,13 +46,13 @@ public class HrmSalaryComponent : AuditEntity, IBranchScopedEntity
     public short IsRegular { get; set; } = 1;
 
     [Column("is_taxable")]
-    public short IsTaxable { get; set; } = 1;
+    public short? IsTaxable { get; set; } = 1;
 
     [Column("affects_net")]
-    public short AffectsNet { get; set; } = 1;
+    public short? AffectsNet { get; set; } = 1;
 
     [Column("is_statutory")]
-    public short IsStatutory { get; set; } = 0;
+    public short? IsStatutory { get; set; } = 0;
 
     [Column("country_code")]
     [StringLength(2)]

@@ -99,7 +99,7 @@ public class HrmEmployeeService : IHrmEmployeeService
             if (dto.ContractType != null) entity.ContractType = dto.ContractType;
             entity.TaxpayerClass = NormalizeTaxpayerClass(dto.TaxpayerClass ?? entity.TaxpayerClass);
             entity.Salary = dto.Salary;
-            entity.IsActive = HrmValidation.NormalizeFlag(dto.IsActive, entity.IsActive, "is_active");
+            entity.IsActive = HrmValidation.NormalizeFlag(dto.IsActive ?? 0, entity.IsActive ?? 0, "is_active");
             entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
             return entity;
@@ -126,7 +126,7 @@ public class HrmEmployeeService : IHrmEmployeeService
             dto.FirstName = firstName;
             dto.TaxpayerClass = NormalizeTaxpayerClass(dto.TaxpayerClass);
             dto.IsDeleted = 0;
-            dto.IsActive = HrmValidation.NormalizeFlag(dto.IsActive, 1, "is_active");
+            dto.IsActive = HrmValidation.NormalizeFlag(dto.IsActive ?? 0, 1, "is_active");
             dto.CreatedBy = _ctx.CurrentUserNo(); dto.CreatedAt = DateTime.UtcNow;
             _db.HrmEmployees.Add(dto);
             await _db.SaveChangesAsync(ct);
@@ -151,7 +151,7 @@ public class HrmEmployeeService : IHrmEmployeeService
             dto.CompanyNo = _ctx.CompanyNo;
             dto.EmployeeId = empId;
             dto.IsDeleted = 0;
-            dto.IsActive = HrmValidation.NormalizeFlag(dto.IsActive, 1, "is_active");
+            dto.IsActive = HrmValidation.NormalizeFlag(dto.IsActive ?? 0, 1, "is_active");
             dto.CreatedBy = _ctx.CurrentUserNo(); dto.CreatedAt = DateTime.UtcNow;
             _db.HrmEmployees.Add(dto);
             results.Add(dto);

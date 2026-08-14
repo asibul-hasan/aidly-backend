@@ -30,18 +30,19 @@ public class InvStockPostingService : IInvStockPostingService
 
         foreach (var leg in cmd.Legs)
         {
-            var stock = await _db.InvStocks.FirstOrDefaultAsync(s => s.WarehouseNo == leg.WarehouseNo && s.ProductNo == leg.ItemNo && s.IsDeleted == 0, ct);
+            var stock = await _db.InvStocks.FirstOrDefaultAsync(s => s.WarehouseNo == leg.WarehouseNo && s.ProductNo == leg.ItemNo, ct);
             if (stock == null)
             {
                 stock = new InvStock
                 {
+                    CompanyNo = cmd.CompanyNo,
+                    BranchNo = cmd.BranchNo,
                     WarehouseNo = leg.WarehouseNo,
-                    ItemNo = leg.ItemNo,
+                    ProductNo = leg.ItemNo,
                     QtyOnHand = 0m,
-                    QtyAllocated = 0m,
-                    QtyOnOrder = 0m,
-                    AvgUnitCost = leg.UnitCost,
-                    IsActive = 1, IsDeleted = 0,
+                    QtyReserved = 0m,
+                    AvgCost = leg.UnitCost,
+                    LastCost = leg.UnitCost,
                     CreatedAt = DateTime.UtcNow
                 };
                 _db.InvStocks.Add(stock);
@@ -52,30 +53,28 @@ public class InvStockPostingService : IInvStockPostingService
 
             if (leg.Quantity > 0) // Stock IN
             {
-                decimal prevTotalValue = stock.QtyOnHand * stock.AvgUnitCost;
+                decimal prevTotalValue = stock.QtyOnHand * stock.AvgCost;
                 decimal addedValue = leg.Quantity * leg.UnitCost;
                 stock.QtyOnHand += leg.Quantity;
                 if (stock.QtyOnHand > 0)
                 {
-                    stock.AvgUnitCost = (prevTotalValue + addedValue) / stock.QtyOnHand;
+                    stock.AvgCost = (prevTotalValue + addedValue) / stock.QtyOnHand;
                 }
+                stock.LastCost = leg.UnitCost;
+                stock.LastMovementAt = DateTime.UtcNow;
                 lineCost = addedValue;
 
                 // Add Valuation Layer
                 var layer = new InvValuationLayer
                 {
                     CompanyNo = cmd.CompanyNo,
-                    BranchNo = cmd.BranchNo,
                     WarehouseNo = leg.WarehouseNo,
-                    ItemNo = leg.ItemNo,
-                    DocType = cmd.RefDocType.ToString(),
-                    DocNo = cmd.RefDocNo,
+                    ProductNo = leg.ItemNo,
+                    ReceiptLedgerNo = 0, // will be set after ledger is saved
                     ReceiptDate = cmd.TxnDate,
-                    QtyReceived = leg.Quantity,
-                    QtyRemaining = leg.Quantity,
+                    OriginalQty = leg.Quantity,
+                    RemainingQty = leg.Quantity,
                     UnitCost = leg.UnitCost,
-                    TotalCost = addedValue,
-                    IsActive = 1, IsDeleted = 0,
                     CreatedAt = DateTime.UtcNow
                 };
                 _db.InvValuationLayers.Add(layer);
@@ -88,12 +87,13 @@ public class InvStockPostingService : IInvStockPostingService
                     throw new ValidationException($"Insufficient stock for item {leg.ItemNo} in warehouse {leg.WarehouseNo}. Available: {stock.QtyOnHand}, Requested: {qtyToRelieve}");
                 }
 
-                lineCost = qtyToRelieve * stock.AvgUnitCost;
+                lineCost = qtyToRelieve * stock.AvgCost;
                 stock.QtyOnHand -= qtyToRelieve;
+                stock.LastMovementAt = DateTime.UtcNow;
 
                 // Relieve FIFO Valuation Layers
                 var layers = await _db.InvValuationLayers
-                    .Where(l => l.WarehouseNo == leg.WarehouseNo && l.ProductNo == leg.ItemNo && l.QtyRemaining > 0 && l.IsDeleted == 0)
+                    .Where(l => l.WarehouseNo == leg.WarehouseNo && l.ProductNo == leg.ItemNo && l.RemainingQty > 0)
                     .OrderBy(l => l.ReceiptDate)
                     .ToListAsync(ct);
 
@@ -101,8 +101,9 @@ public class InvStockPostingService : IInvStockPostingService
                 foreach (var layer in layers)
                 {
                     if (rem <= 0) break;
-                    decimal take = Math.Min(rem, layer.QtyRemaining);
-                    layer.QtyRemaining -= take;
+                    decimal take = Math.Min(rem, layer.RemainingQty);
+                    layer.RemainingQty -= take;
+                    if (layer.RemainingQty <= 0) layer.IsExhausted = 1;
                     rem -= take;
                 }
             }
@@ -113,22 +114,23 @@ public class InvStockPostingService : IInvStockPostingService
                 CompanyNo = cmd.CompanyNo,
                 BranchNo = cmd.BranchNo,
                 WarehouseNo = leg.WarehouseNo,
-                ItemNo = leg.ItemNo,
+                ProductNo = leg.ItemNo,
                 VariantNo = leg.VariantNo,
                 BatchNo = leg.BatchNo,
-                TxnDate = cmd.TxnDate,
-                RefDocType = cmd.RefDocType.ToString(),
-                RefDocNo = cmd.RefDocNo,
-                RefDocId = cmd.RefDocId,
-                MovementType = leg.MovementType.ToString(),
-                Qty = leg.Quantity,
-                UnitCost = stock.AvgUnitCost,
-                TotalCost = lineCost,
-                BalanceQty = stock.QtyOnHand,
-                BalanceAvgCost = stock.AvgUnitCost,
-                FinYearNo = cmd.FinYearNo,
+                MovementDate = cmd.TxnDate,
+                FinYearNo = cmd.FinYearNo ?? 0,
                 FinPeriodNo = cmd.FinPeriodNo,
-                IsActive = 1, IsDeleted = 0,
+                MovementType = leg.MovementType,
+                Direction = leg.Quantity > 0 ? (short)1 : (short)-1,
+                QtyBase = Math.Abs(leg.Quantity),
+                UnitCost = stock.AvgCost,
+                TotalCost = lineCost,
+                BalanceAfter = stock.QtyOnHand,
+                AvgCostAfter = stock.AvgCost,
+                RefDocType = cmd.RefDocType,
+                RefDocNo = cmd.RefDocNo.ToString(),
+                RefDocPk = long.TryParse(cmd.RefDocId, out var rp) ? rp : null,
+                CreatedBy = 0,
                 CreatedAt = DateTime.UtcNow
             };
             _db.InvStockLedgers.Add(ledger);

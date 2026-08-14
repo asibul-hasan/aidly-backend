@@ -14,6 +14,9 @@ public static class SalModuleRegistration
     {
         services.AddModuleDbContext<ISalDbContext, SalDbContext>(connectionString);
 
+        // Contract implementations
+        services.AddScoped<AidlyErp.Sal.Contracts.ISalArLedgerReader, SalArLedgerReader>();
+
         return services;
     }
 }

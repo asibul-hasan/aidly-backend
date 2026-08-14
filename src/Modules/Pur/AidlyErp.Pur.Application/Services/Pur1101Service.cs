@@ -22,6 +22,7 @@ public interface IPur1101Service
     Task<Pur1101OrderDto> SaveAsync(Pur1101OrderDto dto, CancellationToken ct = default);
     Task<Pur1101OrderDto> SubmitAsync(long orderNo, CancellationToken ct = default);
     Task<Pur1101OrderDto> ApproveAsync(long orderNo, CancellationToken ct = default);
+    Task<Pur1101OrderDto> RejectAsync(long orderNo, CancellationToken ct = default);
     Task<Pur1101OrderDto> CancelAsync(long orderNo, string? reason, CancellationToken ct = default);
     Task DeleteAsync(long orderNo, CancellationToken ct = default);
     Task ApplyApprovalOutcomeAsync(long orderNo, bool approved, CancellationToken ct = default);
@@ -78,16 +79,20 @@ public class Pur1101Service : IPur1101Service
             .OrderBy(l => l.OrderDtlNo)
             .ToListAsync(ct);
 
-        var productNos = lines.Select(l => l.ItemNo).Distinct().ToList();
+        var productNos = lines.Select(l => l.ProductNo).Distinct().ToList();
         var products = await _catalog.GetProductNamesAsync(productNos, ct);
+        var uoms = await _catalog.GetUomNamesAsync(lines.Select(l => l.UomNo).Distinct().ToList(), ct);
 
         dto.Lines = lines.Select(l => new Pur1101LineDto
         {
             OrderDtlNo = l.OrderDtlNo,
-            ItemNo = l.ItemNo,
-            ItemName = products.GetValueOrDefault(l.ItemNo),
+            ProductNo = l.ProductNo,
+            ProductName = products.GetValueOrDefault(l.ProductNo),
             UomNo = l.UomNo,
-            Quantity = l.Quantity,
+            UomName = uoms.GetValueOrDefault(l.UomNo),
+            OrderQty = l.OrderQty,
+            // How much of this line has already arrived — the reason a buyer opens a PO.
+            ReceivedQtyBase = l.ReceivedQtyBase,
             UnitPrice = l.UnitPrice,
             LineTotal = l.LineTotal,
             Remarks = l.Remarks
@@ -154,26 +159,54 @@ public class Pur1101Service : IPur1101Service
         var lines = await _db.PurOrderDtls.Where(l => l.OrderNo == orderNo && l.IsDeleted == 0).ToListAsync(ct);
         if (lines.Count == 0) throw new ValidationException("Add at least one line before submitting");
 
-        var outcome = await _approvalService.RaiseAsync(DocType, order.OrderNo, order.OrderId, order.GrandTotal, ct);
-        if (outcome.AutoApproved)
+        order.SubmittedBy = _ctx.CurrentUserNo();
+        order.SubmittedAt = DateTime.UtcNow;
+
+        if (order.ApprovalRequestNo is null)
         {
-            await ApplyApprovalOutcomeAsync(orderNo, true, ct);
+            var outcome = await _approvalService.RaiseAsync(DocType, order.OrderNo, order.OrderId, order.GrandTotal, ct);
+            if (outcome.AutoApproved)
+            {
+                await ApplyApprovalOutcomeAsync(orderNo, true, ct);
+            }
+            else
+            {
+                order.Status = StSubmitted;
+                order.ApprovalRequestNo = outcome.ApprovalRequestNo;
+                order.UpdatedBy = _ctx.CurrentUserNo();
+                order.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync(ct);
+            }
         }
         else
         {
-            order.Status = StSubmitted;
-            order.ApprovalRequestNo = outcome.ApprovalRequestNo;
-            order.UpdatedBy = _ctx.CurrentUserNo();
-            order.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync(ct);
+            // Already in the chain — advance the current step instead of raising a second request.
+            await _approvalService.ActAsync(order.ApprovalRequestNo.Value, true, null, ct);
         }
 
         return await GetDetailAsync(orderNo, ct);
     }
 
+    /// <summary>
+    /// Advances the approval chain rather than stamping the order directly: the engine is what
+    /// checks the acting user holds the current step's role, and it is what fires the completion
+    /// event that calls <see cref="ApplyApprovalOutcomeAsync"/>.
+    /// </summary>
     public async Task<Pur1101OrderDto> ApproveAsync(long orderNo, CancellationToken ct = default)
     {
-        await ApplyApprovalOutcomeAsync(orderNo, true, ct);
+        var order = await RequireAsync(orderNo, ct);
+        if (order.ApprovalRequestNo is null) throw new ValidationException("No approval request — submit first");
+
+        await _approvalService.ActAsync(order.ApprovalRequestNo.Value, true, null, ct);
+        return await GetDetailAsync(orderNo, ct);
+    }
+
+    public async Task<Pur1101OrderDto> RejectAsync(long orderNo, CancellationToken ct = default)
+    {
+        var order = await RequireAsync(orderNo, ct);
+        if (order.ApprovalRequestNo is null) throw new ValidationException("No approval request — submit first");
+
+        await _approvalService.ActAsync(order.ApprovalRequestNo.Value, false, null, ct);
         return await GetDetailAsync(orderNo, ct);
     }
 
@@ -181,6 +214,8 @@ public class Pur1101Service : IPur1101Service
     {
         var order = await RequireAsync(orderNo, ct);
         if (order.Status == StCancelled) throw new ValidationException("Already cancelled");
+        if (order.ReceivedValue > 0)
+            throw new ValidationException("Goods already received against this PO — cannot cancel");
         order.Status = StCancelled;
         if (reason != null) order.Remarks = (order.Remarks != null ? order.Remarks + " | " : "") + "Cancelled: " + reason;
         order.UpdatedBy = _ctx.CurrentUserNo();
@@ -207,6 +242,8 @@ public class Pur1101Service : IPur1101Service
         if (approved)
         {
             order.Status = StApproved;
+            order.ApprovedBy = _ctx.CurrentUserNo();
+            order.ApprovedAt = DateTime.UtcNow;
         }
         else
         {
@@ -226,41 +263,66 @@ public class Pur1101Service : IPur1101Service
         var existing = await _db.PurOrderDtls.Where(l => l.OrderNo == order.OrderNo && l.IsDeleted == 0).ToListAsync(ct);
         foreach (var line in existing) line.PerformSoftDelete(_ctx.CurrentUserNo());
 
-        decimal subTotal = 0, tax = 0;
+        decimal subTotal = 0, discTotal = 0, tax = 0;
         int lineNo = 1;
-        foreach (var r in rows)
+
+        var live = rows.Where(r => r.ProductNo > 0 && r.OrderQty > 0).ToList();
+        var products = await _catalog.GetProductsAsync(live.Select(r => r.ProductNo).Distinct().ToList(),
+                                                       order.CompanyNo, ct);
+        var uom = await PurUomConverter.LoadAsync(_catalog, products.Keys, ct);
+
+        foreach (var r in live)
         {
-            if (r.ItemNo <= 0 || r.Quantity <= 0) continue;
+            if (!products.TryGetValue(r.ProductNo, out var product))
+                throw new NotFoundException($"Product not found: {r.ProductNo}");
 
-            var product = await _catalog.FindProductAsync(r.ItemNo, cancellationToken: ct)
-                ?? throw new NotFoundException($"Product not found: {r.ItemNo}");
+            decimal qty = r.OrderQty;
+            decimal unitPrice = r.UnitPrice;
+            decimal gross = Math.Round(qty * unitPrice, 4);
 
-            decimal lineTotal = r.Quantity * r.UnitPrice;
-            decimal lineTax = lineTotal * 0; // Tax rate from DTO if available
+            // Discount: use explicit amount if set, otherwise compute from pct
+            decimal discPct = r.DiscountPct;
+            decimal discAmt = r.DiscountAmount > 0
+                ? r.DiscountAmount
+                : Math.Round(gross * discPct / 100m, 4);
+
+            decimal taxable = gross - discAmt;
+            decimal taxPct = r.TaxRatePct;
+            decimal lineTax = Math.Round(taxable * taxPct / 100m, 4);
 
             var detail = new PurOrderDtl
             {
                 OrderNo = order.OrderNo,
-                ItemNo = r.ItemNo,
-                UomNo = r.UomNo,
-                Quantity = r.Quantity,
-                UnitPrice = r.UnitPrice,
-                LineTotal = lineTotal + lineTax,
+                LineNo = lineNo++,
+                ProductNo = product.ProductNo,
+                VariantNo = r.VariantNo,
+                UomNo = r.UomNo ?? product.BaseUomNo,
+                OrderQty = qty,
+                OrderQtyBase = uom.ToBaseQty(product, r.UomNo ?? product.BaseUomNo, qty),
+                UnitPrice = unitPrice,
+                DiscountPct = discPct,
+                DiscountAmount = discAmt,
+                VatTaxNo = r.VatTaxNo,
+                TaxRatePct = taxPct,
+                TaxAmount = lineTax,
+                LineTotal = taxable + lineTax,
                 Remarks = r.Remarks,
                 IsDeleted = 0,
                 CreatedBy = _ctx.CurrentUserNo(),
                 CreatedAt = DateTime.UtcNow
             };
             _db.PurOrderDtls.Add(detail);
-            subTotal += lineTotal;
+            subTotal += gross;
+            discTotal += discAmt;
             tax += lineTax;
         }
 
         if (subTotal == 0) throw new ValidationException("All lines are empty");
 
-        order.TotalAmount = subTotal;
+        order.SubTotal = subTotal;
+        order.DiscountTotal = discTotal;
         order.TaxAmount = tax;
-        order.GrandTotal = subTotal + tax;
+        order.GrandTotal = subTotal - discTotal + tax + order.ShippingEstimate;
         await _db.SaveChangesAsync(ct);
     }
 
@@ -314,13 +376,19 @@ public class Pur1101Service : IPur1101Service
         SupplierName = sup.GetValueOrDefault(o.SupplierNo),
         WarehouseNo = o.WarehouseNo,
         WarehouseName = wh.GetValueOrDefault(o.WarehouseNo),
-        TotalAmount = o.TotalAmount,
+        ExpectedDate = o.ExpectedDate,
+        SubTotal = o.SubTotal,
+        DiscountTotal = o.DiscountTotal,
         TaxAmount = o.TaxAmount,
+        ShippingEstimate = o.ShippingEstimate,
         GrandTotal = o.GrandTotal,
+        ReceivedValue = o.ReceivedValue,
+        FinYearNo = o.FinYearNo,
         Status = o.Status,
         ApprovalRequestNo = o.ApprovalRequestNo,
+        TermsNote = o.TermsNote,
         Remarks = o.Remarks,
-        IsActive = o.IsActive,
+        IsActive = o.IsActive ?? 0,
         RowVersion = o.RowVersion
     };
 }

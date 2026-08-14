@@ -87,7 +87,7 @@ public class Hrm1105Service : IHrm1105Service
             OtAmount = hours * hourlyRate * rateMultiplier,
             Reason = dto.Reason,
             Status = StDraft,
-            IsActive = NormalizeFlag(dto.IsActive, 1, "is_active"),
+            IsActive = NormalizeFlag((short)(dto.IsActive ?? 1), 1, "is_active"),
             IsDeleted = 0,
             CreatedBy = _ctx.CurrentUserNo(),
             CreatedAt = DateTime.UtcNow
@@ -107,7 +107,7 @@ public class Hrm1105Service : IHrm1105Service
         if (dto.RateMultiplier != 0) entity.RateMultiplier = Positive(dto.RateMultiplier, "Rate multiplier");
         if (dto.HourlyRate != 0) entity.HourlyRate = NonNeg(dto.HourlyRate, "Hourly rate");
         if (dto.Reason != null) entity.Reason = dto.Reason;
-        if (dto.IsActive != 0) entity.IsActive = NormalizeFlag(dto.IsActive, 1, "is_active");
+        if (dto.IsActive != null) entity.IsActive = NormalizeFlag(dto.IsActive.Value, 1, "is_active");
         entity.OtAmount = entity.Hours * entity.HourlyRate * entity.RateMultiplier;
 
         entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;

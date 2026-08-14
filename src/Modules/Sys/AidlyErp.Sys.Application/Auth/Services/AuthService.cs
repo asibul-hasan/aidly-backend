@@ -164,7 +164,7 @@ public class AuthService : IAuthService
         // Employee-derived display fields, resolved by indexed lookup.
         // Employee display fields come from HRM through its contract, which already resolves
         // department and designation names.
-        var emp = user.EmployeeNo <= 0 ? null : await _employees.FindAsync(user.EmployeeNo);
+        var emp = user.EmployeeNo is null or <= 0 ? null : await _employees.FindAsync(user.EmployeeNo.Value);
 
         string? departmentName = emp?.DepartmentName;
         string? designationName = emp?.DesignationName;
@@ -242,7 +242,7 @@ public class AuthService : IAuthService
         string? employeeName = null, designation = null, companyName = null, branchName = null;
         if (user.EmployeeNo > 0)
         {
-            var emp = await _employees.FindAsync(user.EmployeeNo);
+            var emp = await _employees.FindAsync(user.EmployeeNo!.Value);
             if (emp != null)
             {
                 // Java joins first + last only here — no middle name.

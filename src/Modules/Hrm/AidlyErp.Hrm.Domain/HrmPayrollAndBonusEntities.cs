@@ -18,7 +18,7 @@ public class HrmBonusRun : AuditEntity
     public long? CompanyNo { get; set; }
 
     [Column("branch_no")]
-    public long BranchNo { get; set; }
+    public long? BranchNo { get; set; }
 
     [Column("bonus_name")]
     [StringLength(100)]
@@ -36,7 +36,7 @@ public class HrmBonusRun : AuditEntity
 
     [Column("bonus_period")]
     [StringLength(60)]
-    public string PayPeriod { get; set; } = string.Empty;
+    public string? PayPeriod { get; set; }
 
     [Column("calculation_type")]
     public short? CalculationType { get; set; }
@@ -54,7 +54,7 @@ public class HrmBonusRun : AuditEntity
     public decimal TotalAmount { get; set; } = 0m;
 
     [Column("employee_count")]
-    public int EmployeeCount { get; set; } = 0;
+    public int? EmployeeCount { get; set; } = 0;
 
     [Column("status")]
     public short Status { get; set; } = 1;

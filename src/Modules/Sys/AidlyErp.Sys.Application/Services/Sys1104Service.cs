@@ -276,7 +276,7 @@ public class Sys1104Service : ISys1104Service
         BranchNo = ub.BranchNo,
         BranchName = branchNames.TryGetValue(ub.BranchNo, out var branchName) ? branchName : null,
         RoleNo = ub.RoleNo,
-        RoleName = roleNames.TryGetValue(ub.RoleNo, out var roleName) ? roleName : null,
+        RoleName = ub.RoleNo.HasValue && roleNames.TryGetValue(ub.RoleNo.Value, out var roleName) ? roleName : null,
         IsDefault = ub.IsDefault,
         IsActive = ub.IsActive
     };

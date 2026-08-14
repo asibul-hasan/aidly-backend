@@ -17,7 +17,8 @@ namespace AidlyErp.Fin.Application.Services;
 public interface IFin1401Service
 {
     Task<List<Fin1401YearDto>> GetYearsAndPeriodsAsync(CancellationToken ct = default);
-    Task ClosePeriodAsync(long periodNo, CancellationToken ct = default);
+    Task<List<Fin1401PeriodDto>> GetPeriodsAsync(long finYearNo, CancellationToken ct = default);
+    Task SetPeriodStatusAsync(long periodNo, short status, string? reason = null, CancellationToken ct = default);
     Task<Fin1401CloseResultDto> CloseFiscalYearAsync(Fin1401CloseRequestDto request, CancellationToken ct = default);
 }
 
@@ -28,15 +29,17 @@ public class Fin1401Service : IFin1401Service
     private readonly IFinCalendar _calendar;
     private readonly IFinReportService _reportService;
     private readonly IFin1101Service _voucherService;
+    private readonly IUnitOfWork<IFinDbContext> _uow;
 
     public Fin1401Service(IFinDbContext db, ICompanyBranchContext ctx, IFinReportService reportService, IFin1101Service voucherService,
-                          IFinCalendar calendar)
+                          IFinCalendar calendar, IUnitOfWork<IFinDbContext> uow)
     {
         _db = db;
         _ctx = ctx;
         _reportService = reportService;
         _voucherService = voucherService;
         _calendar = calendar;
+        _uow = uow;
     }
 
     public async Task<List<Fin1401YearDto>> GetYearsAndPeriodsAsync(CancellationToken ct = default)
@@ -56,10 +59,13 @@ public class Fin1401Service : IFin1401Service
                 .Select(p => new Fin1401PeriodDto
                 {
                     FinPeriodNo = p.FinPeriodNo,
+                    FinYearNo = p.FinYearNo,
+                    FinPeriodId = p.FinPeriodId,
                     PeriodName = p.FinPeriodName,
                     StartDate = p.StartDate.ToDateTime(TimeOnly.MinValue),
                     EndDate = p.EndDate.ToDateTime(TimeOnly.MinValue),
-                    IsClosed = p.PeriodStatus == 2 ? (short)1 : (short)0
+                    PeriodStatus = p.PeriodStatus,
+                    IsClosed = p.PeriodStatus != 1 ? (short)1 : (short)0
                 }).ToList();
 
             result.Add(new Fin1401YearDto
@@ -76,79 +82,200 @@ public class Fin1401Service : IFin1401Service
         return result;
     }
 
-    public async Task ClosePeriodAsync(long periodNo, CancellationToken ct = default)
+    public async Task<List<Fin1401PeriodDto>> GetPeriodsAsync(long finYearNo, CancellationToken ct = default)
     {
-        _ = await _calendar.FindPeriodAsync(periodNo, ct)
-            ?? throw new NotFoundException($"Period not found: {periodNo}");
+        long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context is required");
 
-        await _calendar.ClosePeriodAsync(periodNo, _ctx.CurrentUserNo(), ct);
+        var year = await _calendar.FindYearAsync(finYearNo, ct)
+            ?? throw new NotFoundException($"Financial year not found: {finYearNo}");
+
+        if (year.CompanyNo != companyNo) throw new ValidationException("Financial year belongs to another company");
+
+        var periods = await _calendar.ListPeriodsAsync(new[] { finYearNo }, ct);
+
+        return periods.Select(p => new Fin1401PeriodDto
+        {
+            FinPeriodNo = p.FinPeriodNo,
+            FinYearNo = p.FinYearNo,
+            FinPeriodId = p.FinPeriodId,
+            PeriodName = p.FinPeriodName,
+            StartDate = p.StartDate.ToDateTime(TimeOnly.MinValue),
+            EndDate = p.EndDate.ToDateTime(TimeOnly.MinValue),
+            PeriodStatus = p.PeriodStatus,
+            IsClosed = p.PeriodStatus != 1 ? (short)1 : (short)0
+        }).ToList();
+    }
+
+    public async Task SetPeriodStatusAsync(long periodNo, short status, string? reason, CancellationToken ct = default)
+    {
+        await _uow.ExecuteAsync(async token =>
+        {
+            if (status < 1 || status > 3)
+                throw new ValidationException("Status must be 1=Open, 2=Closed or 3=Locked");
+
+            var period = await _calendar.FindPeriodAsync(periodNo, token)
+                ?? throw new NotFoundException($"Period not found: {periodNo}");
+
+            // Irreversibility guard: Locked(3) can NEVER be changed from the UI
+            if (period.PeriodStatus == 3)
+                throw new ValidationException("Locked periods cannot be re-opened. This is the post-year-end seal.");
+
+            // Re-open guard: Closed(2) -> Open(1) requires a reason
+            // The reason is captured in the API request body and logged by AuditLogMiddleware.
+            if (period.PeriodStatus == 2 && status == 1)
+            {
+                if (string.IsNullOrWhiteSpace(reason))
+                    throw new ValidationException("A reason is required to re-open a closed period");
+            }
+
+            // Check parent year is not closed
+            var year = await _calendar.FindYearAsync(period.FinYearNo, token);
+            if (year != null && year.YearStatus == 2)
+                throw new ValidationException("The financial year is closed — periods are locked");
+
+            await _calendar.SetPeriodStatusAsync(periodNo, status, _ctx.CurrentUserNo(), token);
+        }, ct);
     }
 
     public async Task<Fin1401CloseResultDto> CloseFiscalYearAsync(Fin1401CloseRequestDto request, CancellationToken ct = default)
     {
-        var year = await _calendar.FindYearAsync(request.FinYearNo, ct)
-            ?? throw new NotFoundException($"Fiscal Year not found: {request.FinYearNo}");
-
-        if (year.YearStatus == 2) throw new ValidationException("Fiscal Year is already closed");
-
-        var pnl = await _reportService.GetPnlAsync(year.StartDate.ToDateTime(TimeOnly.MinValue),
-                                                   year.EndDate.ToDateTime(TimeOnly.MinValue), ct);
-        decimal netIncome = pnl.NetProfit;
-
-        var vTypeNo = await _voucherService.ResolveSystemJournalTypeAsync(year.CompanyNo, ct);
-
-        var lines = new List<Fin1101VoucherLineDto>();
-
-        if (netIncome != 0)
+        return await _uow.ExecuteAsync(async token =>
         {
-            // Closing entry: transfer net income to retained earnings.
-            // Requires two lines for balanced debit/credit.
-            if (netIncome > 0)
+            long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context is required");
+            long branchNo = _ctx.CurrentBranchNo() ?? throw new ValidationException("Branch context is required");
+
+            if (request.FinYearNo <= 0) throw new ValidationException("Financial year is required");
+            if (request.RetainedEarningsAccountNo <= 0) throw new ValidationException("A retained-earnings account is required");
+            if (request.IncomeSummaryAccountNo <= 0) throw new ValidationException("An income-summary account is required");
+
+            var year = await _calendar.FindYearAsync(request.FinYearNo, token)
+                ?? throw new NotFoundException($"Financial year not found: {request.FinYearNo}");
+
+            if (year.CompanyNo != companyNo) throw new ValidationException("Financial year belongs to another company");
+            if (year.YearStatus == 2) throw new ValidationException("This financial year is already closed");
+
+            // Guard: reject if any period in the year is still Open
+            var periods = await _calendar.ListPeriodsAsync(new[] { request.FinYearNo }, token);
+            var openPeriods = periods.Where(p => p.PeriodStatus == 1).ToList();
+            if (openPeriods.Count > 0)
             {
-                // Profit: Credit retained earnings, Debit income summary
-                lines.Add(new Fin1101VoucherLineDto { AccountNo = request.RetainedEarningsAccountNo, Debit = 0m, Credit = netIncome, LineNarration = "Net income transferred to retained earnings" });
-                lines.Add(new Fin1101VoucherLineDto { AccountNo = request.IncomeSummaryAccountNo, Debit = netIncome, Credit = 0m, LineNarration = "Income summary closed" });
+                var names = string.Join(", ", openPeriods.Select(p => p.FinPeriodName));
+                throw new ValidationException($"Cannot close year: the following periods are still Open: {names}");
             }
-            else
+
+            // Idempotency guard — prevent double-close
+            if (await _voucherService.AlreadyPostedAsync("FIN_YEAR_CLOSE", request.FinYearNo, companyNo, token))
+                throw new ValidationException("A year-end close voucher already exists for this year");
+
+            // Validate retained earnings account
+            var reAccount = await _db.FinAccounts.AsNoTracking().FirstOrDefaultAsync(a => a.AccountNo == request.RetainedEarningsAccountNo && a.CompanyNo == companyNo && a.IsDeleted == 0, token)
+                ?? throw new NotFoundException($"Account not found: {request.RetainedEarningsAccountNo}");
+            if (reAccount.IsPostable != 1) throw new ValidationException("Retained-earnings account must be postable");
+
+            // Validate income summary account
+            var isAccount = await _db.FinAccounts.AsNoTracking().FirstOrDefaultAsync(a => a.AccountNo == request.IncomeSummaryAccountNo && a.CompanyNo == companyNo && a.IsDeleted == 0, token)
+                ?? throw new NotFoundException($"Account not found: {request.IncomeSummaryAccountNo}");
+            if (isAccount.IsPostable != 1) throw new ValidationException("Income summary account must be postable");
+
+            // Use closing voucher type (baseKind=8) if available, fallback to journal
+            var vTypeNo = await _voucherService.ResolveSystemVoucherTypeAsync(companyNo, 8, token);
+
+            // Get windowed P&L for the year
+            var pnl = await _reportService.GetPnlAsync(year.StartDate.ToDateTime(TimeOnly.MinValue),
+                                                       year.EndDate.ToDateTime(TimeOnly.MinValue), null, token);
+
+            var lines = new List<Fin1101VoucherLineDto>();
+            decimal netIncome = pnl.NetProfit;
+
+            // Close each revenue account: Dr revenue for its balance (zero it out)
+            foreach (var row in pnl.RevenueRows)
             {
-                // Loss: Debit retained earnings, Credit income summary
-                decimal absNet = Math.Abs(netIncome);
-                lines.Add(new Fin1101VoucherLineDto { AccountNo = request.RetainedEarningsAccountNo, Debit = absNet, Credit = 0m, LineNarration = "Net loss transferred to retained earnings" });
-                lines.Add(new Fin1101VoucherLineDto { AccountNo = request.IncomeSummaryAccountNo, Debit = 0m, Credit = absNet, LineNarration = "Income summary closed" });
+                if (row.Amount == 0) continue;
+                lines.Add(new Fin1101VoucherLineDto
+                {
+                    AccountNo = row.AccountNo,
+                    Debit = row.Amount,
+                    Credit = 0m,
+                    LineNarration = $"Closing {row.AccountCode} {row.AccountName}"
+                });
             }
-        }
 
-        long voucherNo = 0;
-        string voucherId = "YEAR-END-CLOSE";
+            // Close each expense account: Cr expense for its balance (zero it out)
+            foreach (var row in pnl.ExpenseRows)
+            {
+                if (row.Amount == 0) continue;
+                lines.Add(new Fin1101VoucherLineDto
+                {
+                    AccountNo = row.AccountNo,
+                    Debit = 0m,
+                    Credit = row.Amount,
+                    LineNarration = $"Closing {row.AccountCode} {row.AccountName}"
+                });
+            }
 
-        if (lines.Count > 0)
-        {
-            long branchNo = _ctx.CurrentBranchNo() ?? 1;
-            voucherNo = await _voucherService.PostSystemVoucherAsync(
-                year.CompanyNo,
-                branchNo,
-                vTypeNo,
-                year.EndDate.ToDateTime(TimeOnly.MinValue),
-                request.Narration ?? $"Year-End Closing for {year.YearName}",
-                5,
-                "YearEndClose",
-                year.FinYearNo,
-                lines,
-                ct);
+            // Balancing line to Income Summary or Retained Earnings
+            if (netIncome != 0)
+            {
+                if (netIncome > 0)
+                {
+                    // Profit: Cr retained earnings (or Cr income summary if supplied)
+                    lines.Add(new Fin1101VoucherLineDto
+                    {
+                        AccountNo = request.IncomeSummaryAccountNo > 0 ? request.IncomeSummaryAccountNo : request.RetainedEarningsAccountNo,
+                        Debit = 0m,
+                        Credit = netIncome,
+                        LineNarration = "Net income for the year"
+                    });
+                }
+                else
+                {
+                    // Loss: Dr retained earnings (or Dr income summary if supplied)
+                    decimal absNet = Math.Abs(netIncome);
+                    lines.Add(new Fin1101VoucherLineDto
+                    {
+                        AccountNo = request.IncomeSummaryAccountNo > 0 ? request.IncomeSummaryAccountNo : request.RetainedEarningsAccountNo,
+                        Debit = absNet,
+                        Credit = 0m,
+                        LineNarration = "Net loss for the year"
+                    });
+                }
+            }
 
-            var v = await _db.FinVouchers.FirstOrDefaultAsync(x => x.VoucherNo == voucherNo, ct);
-            if (v != null) voucherId = v.VoucherId;
-        }
+            long voucherNo = 0;
+            string voucherId = "YEAR-END-CLOSE";
 
-        // The fiscal calendar is SYS-owned, so the close is applied through the contract.
-        await _calendar.CloseYearAsync(year.FinYearNo, _ctx.CurrentUserNo(), ct);
+            if (lines.Count >= 2)
+            {
+                voucherNo = await _voucherService.PostSystemVoucherAsync(
+                    year.CompanyNo,
+                    branchNo,
+                    vTypeNo,
+                    year.EndDate.ToDateTime(TimeOnly.MinValue),
+                    request.Narration ?? $"Year-End Closing for {year.YearName}",
+                    5, // SRC_FIN
+                    "FIN_YEAR_CLOSE",
+                    year.FinYearNo,
+                    lines,
+                    token);
 
-        return new Fin1401CloseResultDto
-        {
-            FinYearNo = year.FinYearNo,
-            ClosingVoucherNo = voucherNo,
-            ClosingVoucherId = voucherId,
-            NetIncomeTransferred = netIncome
-        };
+                var v = await _db.FinVouchers.FirstOrDefaultAsync(x => x.VoucherNo == voucherNo, token);
+                if (v != null) voucherId = v.VoucherId;
+            }
+
+            // Lock every period in the year, then close the year
+            foreach (var p in periods)
+            {
+                await _calendar.SetPeriodStatusAsync(p.FinPeriodNo, 3, _ctx.CurrentUserNo(), token);
+            }
+            await _calendar.CloseYearAsync(year.FinYearNo, _ctx.CurrentUserNo(), token);
+
+            return new Fin1401CloseResultDto
+            {
+                FinYearNo = year.FinYearNo,
+                ClosingVoucherNo = voucherNo,
+                ClosingVoucherId = voucherId,
+                NetIncomeTransferred = netIncome
+            };
+        }, ct);
     }
 }

@@ -78,7 +78,7 @@ public class Hrm1104Service : IHrm1104Service
             FromDate = from,
             ToDate = to,
             Status = StDraft,
-            IsActive = NormalizeFlag(dto.IsActive, 1, "is_active"),
+            IsActive = NormalizeFlag((short)(dto.IsActive ?? 1), 1, "is_active"),
             IsDeleted = 0,
             CreatedBy = _ctx.CurrentUserNo(),
             CreatedAt = DateTime.UtcNow
@@ -101,7 +101,7 @@ public class Hrm1104Service : IHrm1104Service
         if (dto.FromDate != default) entity.FromDate = dto.FromDate;
         if (dto.ToDate != default) entity.ToDate = dto.ToDate;
         if (entity.ToDate < entity.FromDate) throw new ValidationException("To date cannot be before from date");
-        if (dto.IsActive != 0) entity.IsActive = NormalizeFlag(dto.IsActive, 1, "is_active");
+        if (dto.IsActive != null) entity.IsActive = NormalizeFlag(dto.IsActive.Value, 1, "is_active");
 
         entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);

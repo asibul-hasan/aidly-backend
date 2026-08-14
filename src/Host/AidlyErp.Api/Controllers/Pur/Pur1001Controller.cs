@@ -20,6 +20,13 @@ public class Pur1001Controller : ApiControllerBase
     [HttpPost("suppliers")]
     public async Task<IActionResult> Save([FromBody] Pur1001SupplierDto dto) => OkResponse(await _service.SaveAsync(dto), dto.SupplierNo.HasValue ? "Supplier updated" : "Supplier created");
 
+    [HttpPut("suppliers/{id:long}")]
+    public async Task<IActionResult> Update(long id, [FromBody] Pur1001SupplierDto dto)
+    {
+        dto.SupplierNo = id;
+        return OkResponse(await _service.SaveAsync(dto), "Supplier updated");
+    }
+
     [HttpDelete("suppliers/{id:long}")]
     public async Task<IActionResult> Delete(long id)
     {

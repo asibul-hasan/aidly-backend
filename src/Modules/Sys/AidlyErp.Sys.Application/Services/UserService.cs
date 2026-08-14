@@ -266,9 +266,9 @@ public class UserService : IUserService
 
         dto.RoleMappings = await ToRoleDtosAsync(mappings, ct);
 
-        if (user.EmployeeNo <= 0) return dto;
+        if (user.EmployeeNo is null or <= 0) return dto;
 
-        var emp = await _employees.FindAsync(user.EmployeeNo, ct);
+        var emp = await _employees.FindAsync(user.EmployeeNo.Value, ct);
 
         if (emp == null) return dto;
 
@@ -310,7 +310,7 @@ public class UserService : IUserService
             UserNo = ub.UserNo,
             BranchNo = ub.BranchNo,
             RoleNo = ub.RoleNo,
-            RoleName = roleNames.TryGetValue(ub.RoleNo, out var name) ? name : null,
+            RoleName = ub.RoleNo.HasValue && roleNames.TryGetValue(ub.RoleNo.Value, out var name) ? name : null,
             IsPrimary = ub.IsDefault,
             IsActive = ub.IsActive,
             RowVersion = ub.RowVersion

@@ -128,6 +128,9 @@ public interface IFinCalendar
     /// <summary>Marks a period closed (<c>period_status = 2</c>).</summary>
     Task ClosePeriodAsync(long finPeriodNo, long actingUserNo, CancellationToken cancellationToken = default);
 
+    /// <summary>Sets a period's status to an arbitrary value (1=Open, 2=Closed, 3=Locked).</summary>
+    Task SetPeriodStatusAsync(long finPeriodNo, short status, long actingUserNo, CancellationToken cancellationToken = default);
+
     /// <summary>Marks a fiscal year closed (<c>year_status = 2</c>).</summary>
     Task CloseYearAsync(long finYearNo, long actingUserNo, CancellationToken cancellationToken = default);
 }

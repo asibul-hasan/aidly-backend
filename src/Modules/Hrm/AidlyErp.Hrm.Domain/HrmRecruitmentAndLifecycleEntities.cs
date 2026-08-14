@@ -198,7 +198,7 @@ public class HrmOffer : AuditEntity
     [NotMapped]
     public DateTime OfferDate
     {
-        get => _offerDate ?? CreatedAt;
+        get => _offerDate ?? CreatedAt ?? DateTime.MinValue;
         set => _offerDate = value;
     }
 

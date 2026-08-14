@@ -16,12 +16,12 @@ namespace AidlyErp.Fin.Application.Services;
 
 public interface IFinReportService
 {
-    Task<List<Fin1301TrialBalanceRowDto>> GetTrialBalanceAsync(DateTime? asOfDate, CancellationToken ct = default);
+    Task<List<Fin1301TrialBalanceRowDto>> GetTrialBalanceAsync(DateTime? asOfDate, long? branchNo = null, CancellationToken ct = default);
     Task<Fin1302LedgerDto> GetGeneralLedgerAsync(long accountNo, DateTime fromDate, DateTime toDate, CancellationToken ct = default);
-    Task<List<Fin1303DayBookRowDto>> GetDayBookAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default);
-    Task<Fin1304PnlDto> GetPnlAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default);
-    Task<Fin1305BalanceSheetDto> GetBalanceSheetAsync(DateTime asOfDate, CancellationToken ct = default);
-    Task<Fin1306CashFlowDto> GetCashFlowAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default);
+    Task<List<Fin1303DayBookRowDto>> GetDayBookAsync(DateTime fromDate, DateTime toDate, long? branchNo = null, CancellationToken ct = default);
+    Task<Fin1304PnlDto> GetPnlAsync(DateTime fromDate, DateTime toDate, long? branchNo = null, CancellationToken ct = default);
+    Task<Fin1305BalanceSheetDto> GetBalanceSheetAsync(DateTime asOfDate, long? branchNo = null, CancellationToken ct = default);
+    Task<Fin1306CashFlowDto> GetCashFlowAsync(DateTime fromDate, DateTime toDate, long? branchNo = null, CancellationToken ct = default);
     Task<Fin1307AgingDto> GetAgingAsync(short partyType, DateTime asOfDate, CancellationToken ct = default);
 }
 
@@ -29,14 +29,18 @@ public class FinReportService : IFinReportService
 {
     private readonly IFinDbContext _db;
     private readonly ICompanyBranchContext _ctx;
+    private readonly IPartyLookup _partyLookup;
+    private readonly IFinCalendar _calendar;
 
-    public FinReportService(IFinDbContext db, ICompanyBranchContext ctx)
+    public FinReportService(IFinDbContext db, ICompanyBranchContext ctx, IPartyLookup partyLookup, IFinCalendar calendar)
     {
         _db = db;
         _ctx = ctx;
+        _partyLookup = partyLookup;
+        _calendar = calendar;
     }
 
-    public async Task<List<Fin1301TrialBalanceRowDto>> GetTrialBalanceAsync(DateTime? asOfDate, CancellationToken ct = default)
+    public async Task<List<Fin1301TrialBalanceRowDto>> GetTrialBalanceAsync(DateTime? asOfDate, long? branchNo = null, CancellationToken ct = default)
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? 0;
         DateTime cutoff = asOfDate ?? DateTime.UtcNow.Date;
@@ -47,9 +51,14 @@ public class FinReportService : IFinReportService
             .OrderBy(a => a.AccountCode)
             .ToListAsync(ct);
 
-        var ledgerSums = await _db.FinLedgers
+        var ledgerQuery = _db.FinLedgers
             .AsNoTracking()
-            .Where(l => l.CompanyNo == companyNo && l.VoucherDate <= cutoff && l.IsDeleted == 0)
+            .Where(l => l.CompanyNo == companyNo && l.VoucherDate <= cutoff && l.IsDeleted == 0);
+
+        if (branchNo.HasValue)
+            ledgerQuery = ledgerQuery.Where(l => l.BranchNo == branchNo.Value);
+
+        var ledgerSums = await ledgerQuery
             .GroupBy(l => l.AccountNo)
             .Select(g => new
             {
@@ -66,10 +75,8 @@ public class FinReportService : IFinReportService
             decimal deb = ledgerSums.ContainsKey(a.AccountNo) ? ledgerSums[a.AccountNo].TotalDebit : 0m;
             decimal cred = ledgerSums.ContainsKey(a.AccountNo) ? ledgerSums[a.AccountNo].TotalCredit : 0m;
 
-            decimal openBal = a.OpeningBalance;
-            decimal closing = a.NormalBalance == "dr"
-                ? (openBal + deb - cred)
-                : (openBal + cred - deb);
+            // Opening balance is ledger-derived only — fin_account.opening_balance is a data-entry seed, never read here.
+            decimal closing = a.NormalBalance == "dr" ? (deb - cred) : (cred - deb);
 
             result.Add(new Fin1301TrialBalanceRowDto
             {
@@ -77,7 +84,7 @@ public class FinReportService : IFinReportService
                 AccountCode = a.AccountCode,
                 AccountName = a.AccountName,
                 RootType = a.RootType,
-                OpeningBalance = openBal,
+                OpeningBalance = 0m,
                 Debit = deb,
                 Credit = cred,
                 ClosingBalance = closing
@@ -101,9 +108,10 @@ public class FinReportService : IFinReportService
         decimal priorDeb = priorLedgers.Sum(l => l.Debit);
         decimal priorCred = priorLedgers.Sum(l => l.Credit);
 
+        // Opening balance is ledger-derived only — fin_account.opening_balance is a data-entry seed.
         decimal openBal = acc.NormalBalance == "dr"
-            ? (acc.OpeningBalance + priorDeb - priorCred)
-            : (acc.OpeningBalance + priorCred - priorDeb);
+            ? (priorDeb - priorCred)
+            : (priorCred - priorDeb);
 
         var periodLedgers = await _db.FinLedgers.AsNoTracking()
             .Where(l => l.AccountNo == accountNo && l.VoucherDate >= fromDate && l.VoucherDate <= toDate && l.IsDeleted == 0)
@@ -150,75 +158,162 @@ public class FinReportService : IFinReportService
         };
     }
 
-    public async Task<List<Fin1303DayBookRowDto>> GetDayBookAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default)
+    public async Task<List<Fin1303DayBookRowDto>> GetDayBookAsync(DateTime fromDate, DateTime toDate, long? branchNo = null, CancellationToken ct = default)
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? 0;
 
-        // Load vouchers first (company-scoped), then load only their details.
-        var vouchers = await _db.FinVouchers.AsNoTracking()
-            .Where(v => v.CompanyNo == companyNo && v.VoucherDate >= fromDate && v.VoucherDate <= toDate && v.IsDeleted == 0 && v.Status == 2)
-            .ToDictionaryAsync(v => v.VoucherNo, ct);
+        // Day Book reads from fin_ledger — the single source of truth.
+        // Cancelled vouchers appear as original + reversal rows, netting to zero.
+        var ledgerQuery = _db.FinLedgers.AsNoTracking()
+            .Where(l => l.CompanyNo == companyNo && l.VoucherDate >= fromDate && l.VoucherDate <= toDate && l.IsDeleted == 0);
 
-        var voucherNos = vouchers.Keys.ToList();
+        if (branchNo.HasValue)
+            ledgerQuery = ledgerQuery.Where(l => l.BranchNo == branchNo.Value);
 
-        var dtls = await _db.FinVoucherDtls.AsNoTracking()
-            .Where(d => voucherNos.Contains(d.VoucherNo) && d.IsDeleted == 0)
+        var ledgerRows = await ledgerQuery
+            .OrderBy(l => l.VoucherDate).ThenBy(l => l.VoucherNo).ThenBy(l => l.LedgerNo)
             .ToListAsync(ct);
 
-        var typeNos = vouchers.Values.Select(v => v.VoucherTypeNo).Distinct().ToList();
-        var types = await _db.FinVoucherTypes.AsNoTracking().Where(t => typeNos.Contains(t.VoucherTypeNo)).ToDictionaryAsync(t => t.VoucherTypeNo, t => t.VoucherTypeName, ct);
+        var voucherNos = ledgerRows.Select(l => l.VoucherNo).Distinct().ToList();
+        var vouchers = await _db.FinVouchers.AsNoTracking()
+            .Where(v => voucherNos.Contains(v.VoucherNo))
+            .ToDictionaryAsync(v => v.VoucherNo, ct);
 
-        var accounts = await _db.FinAccounts.AsNoTracking().Where(a => a.CompanyNo == companyNo && a.IsDeleted == 0).ToDictionaryAsync(a => a.AccountNo, ct);
+        var typeNos = vouchers.Values.Select(v => v.VoucherTypeNo).Distinct().ToList();
+        var types = await _db.FinVoucherTypes.AsNoTracking()
+            .Where(t => typeNos.Contains(t.VoucherTypeNo))
+            .ToDictionaryAsync(t => t.VoucherTypeNo, t => t.VoucherTypeName, ct);
+
+        var accountNos = ledgerRows.Select(l => l.AccountNo).Distinct().ToList();
+        var accounts = await _db.FinAccounts.AsNoTracking()
+            .Where(a => accountNos.Contains(a.AccountNo) && a.IsDeleted == 0)
+            .ToDictionaryAsync(a => a.AccountNo, ct);
 
         var result = new List<Fin1303DayBookRowDto>();
 
-        foreach (var d in dtls)
+        foreach (var l in ledgerRows)
         {
-            if (!vouchers.ContainsKey(d.VoucherNo)) continue;
-            var v = vouchers[d.VoucherNo];
-            var a = accounts.ContainsKey(d.AccountNo) ? accounts[d.AccountNo] : null;
+            vouchers.TryGetValue(l.VoucherNo, out var v);
+            accounts.TryGetValue(l.AccountNo, out var a);
 
             result.Add(new Fin1303DayBookRowDto
             {
-                VoucherNo = v.VoucherNo,
-                VoucherId = v.VoucherId,
-                VoucherTypeName = types.ContainsKey(v.VoucherTypeNo) ? types[v.VoucherTypeNo] : "Journal",
-                VoucherDate = v.VoucherDate,
-                Narration = d.LineNarration ?? v.Narration,
+                VoucherNo = l.VoucherNo,
+                VoucherId = v?.VoucherId,
+                VoucherTypeName = v != null && types.TryGetValue(v.VoucherTypeNo, out var tn) ? tn : "Journal",
+                VoucherDate = l.VoucherDate,
+                Narration = v?.Narration,
                 AccountCode = a?.AccountCode,
                 AccountName = a?.AccountName,
-                Debit = d.Debit,
-                Credit = d.Credit
+                Debit = l.Debit,
+                Credit = l.Credit
             });
         }
 
-        return result.OrderBy(r => r.VoucherDate).ThenBy(r => r.VoucherNo).ToList();
+        return result;
     }
 
-    public async Task<Fin1304PnlDto> GetPnlAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default)
+    public async Task<Fin1304PnlDto> GetPnlAsync(DateTime fromDate, DateTime toDate, long? branchNo = null, CancellationToken ct = default)
     {
-        var tb = await GetTrialBalanceAsync(toDate, ct);
+        long companyNo = _ctx.CurrentCompanyNo() ?? 0;
 
-        var revRows = tb.Where(r => r.RootType == 4).ToList(); // 4 = Revenue
-        var expRows = tb.Where(r => r.RootType == 5).ToList(); // 5 = Expense
+        // P&L is a FLOW statement: windowed on [fromDate, toDate], never cumulative.
+        var ledgerQuery = _db.FinLedgers
+            .AsNoTracking()
+            .Where(l => l.CompanyNo == companyNo && l.VoucherDate >= fromDate && l.VoucherDate <= toDate && l.IsDeleted == 0);
 
-        decimal totalRev = revRows.Sum(r => r.ClosingBalance);
-        decimal totalExp = expRows.Sum(r => r.ClosingBalance);
+        if (branchNo.HasValue)
+            ledgerQuery = ledgerQuery.Where(l => l.BranchNo == branchNo.Value);
+
+        var ledgerSums = await ledgerQuery
+            .GroupBy(l => l.AccountNo)
+            .Select(g => new
+            {
+                AccountNo = g.Key,
+                TotalDebit = g.Sum(x => x.Debit),
+                TotalCredit = g.Sum(x => x.Credit)
+            })
+            .ToDictionaryAsync(x => x.AccountNo, ct);
+
+        var accountNos = ledgerSums.Keys.ToList();
+        var accounts = await _db.FinAccounts
+            .AsNoTracking()
+            .Where(a => accountNos.Contains(a.AccountNo) && a.IsDeleted == 0)
+            .ToDictionaryAsync(a => a.AccountNo, ct);
+
+        var revenueRows = new List<FinStatementRowDto>();
+        var expenseRows = new List<FinStatementRowDto>();
+        decimal totalRev = 0, totalExp = 0;
+
+        foreach (var kv in ledgerSums)
+        {
+            if (!accounts.TryGetValue(kv.Key, out var acc)) continue;
+            decimal movement = 0;
+
+            if (acc.RootType == 4) // Revenue
+            {
+                movement = kv.Value.TotalCredit - kv.Value.TotalDebit;
+                if (movement == 0) continue;
+                revenueRows.Add(new FinStatementRowDto
+                {
+                    AccountNo = acc.AccountNo,
+                    AccountCode = acc.AccountCode,
+                    AccountName = acc.AccountName,
+                    RootType = acc.RootType,
+                    Amount = movement
+                });
+                totalRev += movement;
+            }
+            else if (acc.RootType == 5) // Expense
+            {
+                movement = kv.Value.TotalDebit - kv.Value.TotalCredit;
+                if (movement == 0) continue;
+                expenseRows.Add(new FinStatementRowDto
+                {
+                    AccountNo = acc.AccountNo,
+                    AccountCode = acc.AccountCode,
+                    AccountName = acc.AccountName,
+                    RootType = acc.RootType,
+                    Amount = movement
+                });
+                totalExp += movement;
+            }
+        }
+
+        revenueRows.Sort((a, b) => string.Compare(a.AccountCode, b.AccountCode, StringComparison.Ordinal));
+        expenseRows.Sort((a, b) => string.Compare(a.AccountCode, b.AccountCode, StringComparison.Ordinal));
 
         return new Fin1304PnlDto
         {
-            RevenueRows = revRows.Cast<FinStatementRowDto>().ToList(),
+            RevenueRows = revenueRows,
             TotalRevenue = totalRev,
-            ExpenseRows = expRows.Cast<FinStatementRowDto>().ToList(),
+            ExpenseRows = expenseRows,
             TotalExpense = totalExp,
             NetProfit = totalRev - totalExp
         };
     }
 
-    public async Task<Fin1305BalanceSheetDto> GetBalanceSheetAsync(DateTime asOfDate, CancellationToken ct = default)
+    public async Task<Fin1305BalanceSheetDto> GetBalanceSheetAsync(DateTime asOfDate, long? branchNo = null, CancellationToken ct = default)
     {
-        var tb = await GetTrialBalanceAsync(asOfDate, ct);
-        var pnl = await GetPnlAsync(DateTime.MinValue, asOfDate, ct);
+        long companyNo = _ctx.CurrentCompanyNo() ?? 0;
+        var tb = await GetTrialBalanceAsync(asOfDate, branchNo, ct);
+
+        // Resolve fiscal-year start for the P&L window
+        string? warning = null;
+        DateTime pnlFromDate;
+        var finYear = await _calendar.FindYearForDateAsync(companyNo, DateOnly.FromDateTime(asOfDate), ct);
+        if (finYear != null)
+        {
+            pnlFromDate = finYear.StartDate.ToDateTime(TimeOnly.MinValue);
+        }
+        else
+        {
+            // No fiscal year covers the date — fall back to calendar year with explicit warning
+            pnlFromDate = asOfDate.AddYears(-1);
+            warning = $"No fiscal year covers {asOfDate:yyyy-MM-dd}; current-year earnings assume a calendar year";
+        }
+
+        var pnl = await GetPnlAsync(pnlFromDate, asOfDate, branchNo, ct);
 
         var assetRows = tb.Where(r => r.RootType == 1).ToList();      // 1 = Asset
         var liabilityRows = tb.Where(r => r.RootType == 2).ToList();  // 2 = Liability
@@ -236,11 +331,13 @@ public class FinReportService : IFinReportService
             TotalLiabilities = totalLiabilities,
             EquityRows = equityRows.Cast<FinStatementRowDto>().ToList(),
             TotalEquity = totalEquity,
-            RetainedEarnings = pnl.NetProfit
+            RetainedEarnings = pnl.NetProfit,
+            IsBalanced = Math.Abs(totalAssets - (totalLiabilities + totalEquity + pnl.NetProfit)) < 0.005m,
+            Warning = warning
         };
     }
 
-    public async Task<Fin1306CashFlowDto> GetCashFlowAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default)
+    public async Task<Fin1306CashFlowDto> GetCashFlowAsync(DateTime fromDate, DateTime toDate, long? branchNo = null, CancellationToken ct = default)
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? 0;
 
@@ -254,8 +351,11 @@ public class FinReportService : IFinReportService
 
         // Opening balances = cumulative debit-credit up to day before fromDate.
         var openingDate = fromDate.AddDays(-1);
-        var openingLedger = await _db.FinLedgers.AsNoTracking()
-            .Where(l => cashAccNos.Contains(l.AccountNo) && l.VoucherDate <= openingDate && l.IsDeleted == 0)
+        var openingQuery = _db.FinLedgers.AsNoTracking()
+            .Where(l => cashAccNos.Contains(l.AccountNo) && l.VoucherDate <= openingDate && l.IsDeleted == 0);
+        if (branchNo.HasValue) openingQuery = openingQuery.Where(l => l.BranchNo == branchNo.Value);
+
+        var openingLedger = await openingQuery
             .Select(l => new { l.AccountNo, l.Debit, l.Credit })
             .ToListAsync(ct);
         var opening = openingLedger
@@ -263,8 +363,11 @@ public class FinReportService : IFinReportService
             .ToDictionary(g => g.Key, g => g.Sum(l => l.Debit - l.Credit));
 
         // Period movements = debits (receipts) and credits (payments) within [fromDate, toDate].
-        var moveLedger = await _db.FinLedgers.AsNoTracking()
-            .Where(l => cashAccNos.Contains(l.AccountNo) && l.VoucherDate >= fromDate && l.VoucherDate <= toDate && l.IsDeleted == 0)
+        var moveQuery = _db.FinLedgers.AsNoTracking()
+            .Where(l => cashAccNos.Contains(l.AccountNo) && l.VoucherDate >= fromDate && l.VoucherDate <= toDate && l.IsDeleted == 0);
+        if (branchNo.HasValue) moveQuery = moveQuery.Where(l => l.BranchNo == branchNo.Value);
+
+        var moveLedger = await moveQuery
             .Select(l => new { l.AccountNo, l.Debit, l.Credit })
             .ToListAsync(ct);
         var move = moveLedger
@@ -322,18 +425,33 @@ public class FinReportService : IFinReportService
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? 0;
 
-        // Load vouchers first (company-scoped), then only their details.
-        var vouchers = await _db.FinVouchers.AsNoTracking()
-            .Where(v => v.CompanyNo == companyNo && v.VoucherDate <= asOfDate && v.Status == 2 && v.IsDeleted == 0)
-            .ToDictionaryAsync(v => v.VoucherNo, ct);
+        // Aging reads from fin_ledger — the single source of truth.
+        // Restrict to control accounts: AR (ControlType=1) for customers, AP (ControlType=2) for suppliers.
+        short controlType = partyType == 1 ? (short)1 : (short)2;
 
-        var voucherNos = vouchers.Keys.ToList();
-
-        var dtls = await _db.FinVoucherDtls.AsNoTracking()
-            .Where(d => voucherNos.Contains(d.VoucherNo) && d.PartyType == partyType && d.PartyNo.HasValue && d.IsDeleted == 0)
+        var controlAccounts = await _db.FinAccounts.AsNoTracking()
+            .Where(a => a.CompanyNo == companyNo && a.ControlType == controlType && a.IsDeleted == 0)
+            .Select(a => a.AccountNo)
             .ToListAsync(ct);
 
-        var groups = dtls.GroupBy(d => d.PartyNo!.Value);
+        if (controlAccounts.Count == 0)
+        {
+            return new Fin1307AgingDto { AsOfDate = asOfDate, PartyType = partyType, Rows = new(), GrandTotal = 0 };
+        }
+
+        // Load ledger rows for control accounts with party info
+        var ledgerRows = await _db.FinLedgers.AsNoTracking()
+            .Where(l => controlAccounts.Contains(l.AccountNo) && l.CompanyNo == companyNo
+                        && l.VoucherDate <= asOfDate && l.PartyType == partyType && l.PartyNo.HasValue
+                        && l.IsDeleted == 0)
+            .ToListAsync(ct);
+
+        // Group by party and compute aging buckets
+        var groups = ledgerRows.GroupBy(l => l.PartyNo!.Value);
+        var partyNos = groups.Select(g => g.Key).ToList();
+
+        // Batch-load party names in ONE query
+        var partyNames = await _partyLookup.GetPartyNamesAsync(partyType, partyNos, ct);
 
         var rows = new List<Fin1307AgingRowDto>();
 
@@ -341,11 +459,11 @@ public class FinReportService : IFinReportService
         {
             decimal current = 0, days31_60 = 0, days61_90 = 0, daysOver90 = 0;
 
-            foreach (var d in g)
+            foreach (var l in g)
             {
-                decimal amount = d.Debit - d.Credit;
-                if (!vouchers.TryGetValue(d.VoucherNo, out var v)) continue;
-                int days = (asOfDate - v.VoucherDate).Days;
+                // AR: debit increases receivable; AP: credit increases payable
+                decimal amount = partyType == 1 ? (l.Debit - l.Credit) : (l.Credit - l.Debit);
+                int days = (asOfDate - l.VoucherDate).Days;
 
                 if (days <= 30) current += amount;
                 else if (days <= 60) days31_60 += amount;
@@ -356,7 +474,7 @@ public class FinReportService : IFinReportService
             rows.Add(new Fin1307AgingRowDto
             {
                 PartyNo = g.Key,
-                PartyName = $"Party #{g.Key}",
+                PartyName = partyNames.GetValueOrDefault(g.Key) ?? $"Party #{g.Key}",
                 CurrentAmount = current,
                 Days3160 = days31_60,
                 Days6190 = days61_90,
@@ -369,7 +487,7 @@ public class FinReportService : IFinReportService
         {
             AsOfDate = asOfDate,
             PartyType = partyType,
-            Rows = rows,
+            Rows = rows.OrderByDescending(r => r.TotalOutstanding).ToList(),
             GrandTotal = rows.Sum(r => r.TotalOutstanding)
         };
     }

@@ -1,5 +1,6 @@
 using AidlyErp.Fin.Application.Interfaces;
 using AidlyErp.Fin.Domain;
+using AidlyErp.Sys.Domain;
 using AidlyErp.Shared.Core.Security;
 using AidlyErp.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,8 @@ public class FinDbContext : ModuleDbContext, IFinDbContext
     public DbSet<FinBankAccount> FinBankAccounts => Set<FinBankAccount>();
     public DbSet<FinBankRecon> FinBankRecons => Set<FinBankRecon>();
     public DbSet<FinBankReconLine> FinBankReconLines => Set<FinBankReconLine>();
+
+    public DbSet<Currency> Currencies => Set<Currency>();
 
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {

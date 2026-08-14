@@ -78,7 +78,7 @@ public class Hrm1404Service : IHrm1404Service
             JoiningDate = dto.JoiningDate,
             Notes = dto.Notes,
             Status = StDraft,
-            IsActive = NormalizeFlag(dto.IsActive, 1, "is_active"),
+            IsActive = NormalizeFlag((short)(dto.IsActive ?? 1), 1, "is_active"),
             IsDeleted = 0,
             CreatedBy = _ctx.CurrentUserNo(),
             CreatedAt = DateTime.UtcNow
@@ -106,7 +106,7 @@ public class Hrm1404Service : IHrm1404Service
         if (dto.OfferedSalary != null) entity.OfferedSalary = RequireSalary(dto.OfferedSalary);
         if (dto.JoiningDate != default) entity.JoiningDate = dto.JoiningDate;
         if (dto.Notes != null) entity.Notes = dto.Notes;
-        if (dto.IsActive != 0) entity.IsActive = NormalizeFlag(dto.IsActive, 1, "is_active");
+        if (dto.IsActive != null) entity.IsActive = NormalizeFlag(dto.IsActive.Value, 1, "is_active");
 
         entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);

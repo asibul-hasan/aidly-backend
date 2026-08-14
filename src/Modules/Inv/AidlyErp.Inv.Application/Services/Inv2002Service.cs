@@ -1,87 +1,140 @@
-using AidlyErp.Inv.Application.Interfaces;
-using Microsoft.EntityFrameworkCore;
-using AidlyErp.Shared.Core.Exceptions;
-using AidlyErp.Shared.Core.Abstractions;
-using AidlyErp.Shared.Contracts;
-using AidlyErp.Sys.Contracts;
-using AidlyErp.Shared.Core.Security;
 using AidlyErp.Inv.Application.Dto;
+using AidlyErp.Inv.Application.Interfaces;
 using AidlyErp.Inv.Domain;
+using AidlyErp.Shared.Core.Exceptions;
+using AidlyErp.Shared.Core.Security;
+using Microsoft.EntityFrameworkCore;
 
 namespace AidlyErp.Inv.Application.Services;
 
 public interface IInv2002Service
 {
-    Task<List<Inv2002RackDto>> GetListAsync(CancellationToken ct = default);
+    Task<List<Inv2002RackDto>> GetListAsync(long warehouseNo, CancellationToken ct = default);
     Task<Inv2002RackDto> SaveAsync(Inv2002RackDto dto, CancellationToken ct = default);
     Task DeleteAsync(long rackNo, CancellationToken ct = default);
 }
 
+/// <summary>
+/// INV_2002 Rack / Shelf Setup — bin locations inside a warehouse. Racks hang off a warehouse, so
+/// every read is scoped through one; the warehouse itself carries the tenant.
+/// </summary>
 public class Inv2002Service : IInv2002Service
 {
+    private const short Deleted = 0;
+
     private readonly IInvDbContext _db;
     private readonly ICompanyBranchContext _ctx;
-    public Inv2002Service(IInvDbContext db, ICompanyBranchContext ctx) { _db = db; _ctx = ctx; }
 
-    public async Task<List<Inv2002RackDto>> GetListAsync(CancellationToken ct = default) =>
-        await _db.InvRacks.AsNoTracking()
-            .Where(r => r.IsDeleted == 0)
+    public Inv2002Service(IInvDbContext db, ICompanyBranchContext ctx)
+    {
+        _db = db;
+        _ctx = ctx;
+    }
+
+    public async Task<List<Inv2002RackDto>> GetListAsync(long warehouseNo, CancellationToken ct = default)
+    {
+        var warehouse = await RequireWarehouseAsync(warehouseNo, ct);
+
+        var rows = await _db.InvRacks.AsNoTracking()
+            .Where(r => r.WarehouseNo == warehouseNo && r.IsDeleted == Deleted)
             .OrderBy(r => r.RackNo)
-            .Select(r => new Inv2002RackDto
-            {
-                RackNo = r.RackNo,
-                RackCode = r.RackCode,
-                RackName = r.RackName,
-                WarehouseNo = r.WarehouseNo,
-                IsActive = r.IsActive
-            })
             .ToListAsync(ct);
+
+        return rows.Select(r => ToDto(r, warehouse.WarehouseName)).ToList();
+    }
 
     public async Task<Inv2002RackDto> SaveAsync(Inv2002RackDto dto, CancellationToken ct = default)
     {
-        if (dto.RackNo > 0)
+        var warehouse = await RequireWarehouseAsync(dto.WarehouseNo, ct);
+
+        if (string.IsNullOrWhiteSpace(dto.RackId)) throw new ValidationException("Rack code is required");
+
+        InvRack e;
+        if (dto.RackNo is > 0)
         {
-            var entity = await _db.InvRacks.FirstOrDefaultAsync(r => r.RackNo == dto.RackNo && r.IsDeleted == 0, ct)
+            e = await _db.InvRacks.FirstOrDefaultAsync(r => r.RackNo == dto.RackNo.Value && r.IsDeleted == Deleted, ct)
                 ?? throw new NotFoundException($"Rack not found: {dto.RackNo}");
-            if (dto.RackCode != null) entity.RackCode = dto.RackCode;
-            if (dto.RackName != null) entity.RackName = dto.RackName;
-            entity.WarehouseNo = dto.WarehouseNo;
-            entity.IsActive = dto.IsActive;
-            entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync(ct);
-            return MapToDto(entity);
+
+            // Re-check through the rack's own warehouse so a foreign rack can't be edited by id.
+            await RequireWarehouseAsync(e.WarehouseNo, ct);
+
+            if (!string.Equals(e.RackId, dto.RackId, StringComparison.OrdinalIgnoreCase)
+                && await CodeTakenAsync(dto.WarehouseNo, dto.RackId!, e.RackNo, ct))
+            {
+                throw new ValidationException($"Rack code already exists: {dto.RackId}");
+            }
+        }
+        else
+        {
+            if (await CodeTakenAsync(dto.WarehouseNo, dto.RackId!, null, ct))
+                throw new ValidationException($"Rack code already exists: {dto.RackId}");
+
+            e = new InvRack
+            {
+                CreatedBy = _ctx.CurrentUserNo(),
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = 0
+            };
+            _db.InvRacks.Add(e);
         }
 
-        if (string.IsNullOrWhiteSpace(dto.RackName)) throw new ValidationException("Rack name is required");
-        var newRack = new InvRack
-        {
-            RackCode = dto.RackCode ?? "",
-            RackName = dto.RackName,
-            WarehouseNo = dto.WarehouseNo,
-            IsActive = dto.IsActive > 0 ? dto.IsActive : (short)1,
-            IsDeleted = 0,
-            CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow
-        };
-        _db.InvRacks.Add(newRack);
+        e.WarehouseNo = dto.WarehouseNo;
+        e.RackId = dto.RackId!;
+        e.RackName = dto.RackName;
+        e.Aisle = dto.Aisle;
+        e.Rack = dto.Rack;
+        e.Shelf = dto.Shelf;
+        e.Bin = dto.Bin;
+        e.IsActive = dto.IsActive ?? 1;
+        e.UpdatedBy = _ctx.CurrentUserNo();
+        e.UpdatedAt = DateTime.UtcNow;
+
         await _db.SaveChangesAsync(ct);
-        return MapToDto(newRack);
+        return ToDto(e, warehouse.WarehouseName);
     }
 
     public async Task DeleteAsync(long rackNo, CancellationToken ct = default)
     {
-        var entity = await _db.InvRacks.FirstOrDefaultAsync(r => r.RackNo == rackNo && r.IsDeleted == 0, ct)
-            ?? throw new NotFoundException($"Rack not found: {rackNo}");
-        entity.IsDeleted = 1; entity.IsActive = 0;
-        entity.DeletedBy = _ctx.CurrentUserNo(); entity.DeletedAt = DateTime.UtcNow;
+        var e = await _db.InvRacks.FirstOrDefaultAsync(r => r.RackNo == rackNo && r.IsDeleted == Deleted, ct)
+                ?? throw new NotFoundException($"Rack not found: {rackNo}");
+
+        await RequireWarehouseAsync(e.WarehouseNo, ct);
+
+        e.PerformSoftDelete(_ctx.CurrentUserNo());
         await _db.SaveChangesAsync(ct);
     }
 
-    private static Inv2002RackDto MapToDto(InvRack r) => new()
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private async Task<bool> CodeTakenAsync(long warehouseNo, string rackId, long? excludeNo, CancellationToken ct) =>
+        await _db.InvRacks.AnyAsync(
+            r => r.WarehouseNo == warehouseNo && r.RackId == rackId && r.IsDeleted == Deleted
+                 && (excludeNo == null || r.RackNo != excludeNo), ct);
+
+    private async Task<InvWarehouse> RequireWarehouseAsync(long warehouseNo, CancellationToken ct)
+    {
+        if (warehouseNo <= 0) throw new ValidationException("Warehouse is required");
+
+        long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("No active company in context");
+
+        return await _db.InvWarehouses.AsNoTracking()
+                   .FirstOrDefaultAsync(w => w.WarehouseNo == warehouseNo && w.CompanyNo == companyNo
+                                             && w.IsDeleted == Deleted, ct)
+               ?? throw new NotFoundException("Warehouse not found");
+    }
+
+    private static Inv2002RackDto ToDto(InvRack r, string? warehouseName) => new()
     {
         RackNo = r.RackNo,
-        RackCode = r.RackCode,
-        RackName = r.RackName,
         WarehouseNo = r.WarehouseNo,
-        IsActive = r.IsActive
+        WarehouseName = warehouseName,
+        RackId = r.RackId,
+        RackName = r.RackName,
+        Aisle = r.Aisle,
+        Rack = r.Rack,
+        Shelf = r.Shelf,
+        Bin = r.Bin,
+        IsActive = r.IsActive,
+        RowVersion = r.RowVersion
     };
 }

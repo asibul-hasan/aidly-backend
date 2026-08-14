@@ -16,6 +16,12 @@ public interface ISalDbContext
     DbSet<SalReceiptAlloc> SalReceiptAllocs { get; }
     DbSet<SalReturn> SalReturns { get; }
     DbSet<SalReturnDtl> SalReturnDtls { get; }
+    DbSet<SalPosTerminal> SalPosTerminals { get; }
+    DbSet<SalPosSession> SalPosSessions { get; }
+    DbSet<SalInvoicePayment> SalInvoicePayments { get; }
+    DbSet<SalCustomerGroup> SalCustomerGroups { get; }
+    DbSet<SalPromotion> SalPromotions { get; }
+    DbSet<SalPromotionDtl> SalPromotionDtls { get; }
 
     DbSet<AidlyErp.Shared.Core.EventOutbox> EventOutboxes { get; }
 

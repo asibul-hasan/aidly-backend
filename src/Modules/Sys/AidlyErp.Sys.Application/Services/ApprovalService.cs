@@ -632,7 +632,7 @@ public class ApprovalService : IApprovalService
 
         var recipients = await _db.Users
             .AsNoTracking()
-            .Where(u => employeeNos.Contains(u.EmployeeNo) && u.IsDeleted == Deleted && u.IsActive == 1)
+            .Where(u => u.EmployeeNo != null && employeeNos.Contains(u.EmployeeNo.Value) && u.IsDeleted == Deleted && u.IsActive == 1)
             .Select(u => new { u.UserNo, u.EmployeeNo })
             .ToListAsync(ct);
 

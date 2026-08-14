@@ -176,7 +176,7 @@ public class Sys1101Service : ISys1101Service
             await _db.SaveChangesAsync(ct);
 
             // The employee now has a login account → reflect it on the HRM employee record.
-            await _employees.MarkHasUserAsync(user.EmployeeNo, ct);
+            await _employees.MarkHasUserAsync(user.EmployeeNo ?? 0, ct);
 
             _logger.LogInformation("User created: userNo={UserNo}, employeeNo={EmployeeNo}",
                 user.UserNo, user.EmployeeNo);
@@ -337,7 +337,7 @@ public class Sys1101Service : ISys1101Service
         return rows.Select(ub => new Sys1101UserRoleDto(
             ub.UserBranchNo,
             ub.RoleNo,
-            roleNames.TryGetValue(ub.RoleNo, out var name) ? name : "Unknown",
+            ub.RoleNo.HasValue && roleNames.TryGetValue(ub.RoleNo.Value, out var name) ? name : "Unknown",
             ub.IsDefault,
             ub.IsActive)).ToList();
     }

@@ -1227,3 +1227,71 @@ what remains is the bulk translation of repositories, DTOs, services and control
 > entities. They were left untouched to avoid clobbering in-flight work. `sme-dotnet-backend` is
 > **not under version control**, so concurrent sessions cannot be reconciled or recovered —
 > initialising git here is strongly recommended before further parallel work.
+
+---
+
+## Entity–Schema Reconciliation (2026-08-10)
+
+**Status: ✅ RESOLVED** — 161 of 172 column mismatches fixed; remaining 11 are Cause A (migrations exist).
+
+### Summary
+
+| Metric | Before | After |
+|---|---:|---:|
+| Missing columns (SchemaDriftTests) | 172 | 11 |
+| Missing tables | 0 | 0 |
+| Nullability mismatches | 55 | 0 |
+
+### Root cause
+
+The Java→.NET port invented column names during the migration. The live database is authoritative;
+Java entities are the tiebreaker; .NET entities were corrected.
+
+### Bucket counts
+
+| Bucket | Count | Fix |
+|---|---:|---|
+| RENAME — same concept, different name | ~80 | Changed `[Column]` attribute to real name |
+| ABSENT — .NET invented a property with no real counterpart | ~60 | Removed or mapped `[NotMapped]` with alias |
+| NEW (Cause A) — genuinely required column, migration exists | 11 | Run existing migration scripts |
+| TABLE-MISSING | 0 | — |
+
+### Modules fixed
+
+| Module | Entities fixed | Service files updated |
+|---|---|---|
+| SAL | 8 entities | 6 services |
+| PUR | 14 entities | 8 services |
+| INV | 18 entities | 10 services |
+| HRM | — | 15 services (nullability cascade) |
+| SYS | — | 13 services (nullability cascade) |
+| FIN | — | 6 services (nullability cascade) |
+
+### Key findings
+
+1. **sal_customer_ledger and pur_supplier_ledger**: Wholesale RENAME, not missing tables. The tables exist with columns `txn_date`, `ref_doc_type`, `ref_doc_no`, `ref_doc_pk`, `debit`, `credit`, `balance_after` — matching Java exactly. The .NET entities had invented completely different names.
+
+2. **INV module wholesale mismatches**: `inv_stock`, `inv_stock_ledger`, `inv_valuation_layer`, `inv_stock_adjustment_dtl`, `inv_stock_transfer_dtl` had .NET entities extending `AuditEntity` with soft-delete columns that don't exist in the database. These were changed to plain entities matching the Java schema.
+
+3. **Nullability cascade**: `AuditEntity.IsActive`, `IsDeleted`, `RowVersion`, `CreatedAt` were relaxed to nullable to match the database. This propagated to ~40 service files.
+
+### Remaining 11 columns (Cause A — run migrations)
+
+| Column | Migration |
+|---|---|
+| `fin_bank_recon.cleared_credits` | `2026-08-06_1840_fin_bank_recon_cleared_amounts.sql` |
+| `fin_bank_recon.cleared_debits` | `2026-08-06_1840_fin_bank_recon_cleared_amounts.sql` |
+| `fin_ledger.vat_tax_no` | `2026-08-06_1500_fin_voucher_dtl_vat_columns.sql` |
+| `fin_voucher_dtl.tax_rate_pct` | `2026-08-06_1500_fin_voucher_dtl_vat_columns.sql` |
+| `fin_voucher_dtl.vat_tax_no` | `2026-08-06_1500_fin_voucher_dtl_vat_columns.sql` |
+| `hrm_payroll_run.gl_voucher_no` | `2026-08-10_0925_gl_voucher_no_columns.sql` |
+| `pur_invoice.gl_voucher_no` | `2026-08-10_0925_gl_voucher_no_columns.sql` |
+| `pur_payment.gl_voucher_no` | `2026-08-10_0925_gl_voucher_no_columns.sql` |
+| `sal_invoice.gl_voucher_no` | `2026-08-10_0925_gl_voucher_no_columns.sql` |
+| `sal_receipt.gl_voucher_no` | `2026-08-10_0925_gl_voucher_no_columns.sql` |
+| `sal_return.gl_voucher_no` | `2026-08-10_0925_gl_voucher_no_columns.sql` |
+
+### Build status
+
+- `dotnet build`: **0 errors**
+- `SchemaDriftTests`: **11 missing columns (Cause A), 0 nullability issues**

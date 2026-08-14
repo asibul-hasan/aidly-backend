@@ -38,16 +38,16 @@ public class HrmPayslip : AuditEntity, IBranchScopedEntity, IEmployeeOwnedEntity
     public decimal BasicSalary { get; set; } = 0;
 
     [Column("present_days")]
-    public decimal PresentDays { get; set; } = 0;
+    public decimal? PresentDays { get; set; } = 0;
 
     [Column("absent_days")]
-    public decimal AbsentDays { get; set; } = 0;
+    public decimal? AbsentDays { get; set; } = 0;
 
     [Column("leave_days")]
-    public decimal LeaveDays { get; set; } = 0;
+    public decimal? LeaveDays { get; set; } = 0;
 
     [Column("lwp_days")]
-    public decimal LwpDays { get; set; } = 0;
+    public decimal? LwpDays { get; set; } = 0;
 
     [Column("payable_days")]
     public decimal PayableDays { get; set; } = 0;

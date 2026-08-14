@@ -72,16 +72,16 @@ public class Hrm1007Service : IHrm1007Service
             entity.IsProratable = HrmValidation.NormalizeFlag(dto.IsProratable, entity.IsProratable, "is_proratable");
             entity.IsAttendanceDependent = HrmValidation.NormalizeFlag(dto.IsAttendanceDependent, entity.IsAttendanceDependent, "is_attendance_dependent");
             entity.IsRegular = HrmValidation.NormalizeFlag(dto.IsRegular, entity.IsRegular, "is_regular");
-            entity.IsTaxable = HrmValidation.NormalizeFlag(dto.IsTaxable, entity.IsTaxable, "is_taxable");
-            entity.AffectsNet = HrmValidation.NormalizeFlag(dto.AffectsNet, entity.AffectsNet, "affects_net");
-            entity.IsStatutory = HrmValidation.NormalizeFlag(dto.IsStatutory, entity.IsStatutory, "is_statutory");
+            entity.IsTaxable = HrmValidation.NormalizeFlag(dto.IsTaxable ?? 0, entity.IsTaxable ?? 0, "is_taxable");
+            entity.AffectsNet = HrmValidation.NormalizeFlag(dto.AffectsNet ?? 0, entity.AffectsNet ?? 0, "affects_net");
+            entity.IsStatutory = HrmValidation.NormalizeFlag(dto.IsStatutory ?? 0, entity.IsStatutory ?? 0, "is_statutory");
             entity.CountryCode = TrimToNull(dto.CountryCode);
             entity.GlAccountCode = TrimToNull(dto.GlAccountCode);
             entity.DisplayOrder = dto.DisplayOrder;
             entity.RoundingMode = dto.RoundingMode;
             entity.RoundingScale = dto.RoundingScale;
             entity.Remarks = dto.Remarks;
-            entity.IsActive = HrmValidation.NormalizeFlag(dto.IsActive, entity.IsActive, "is_active");
+            entity.IsActive = HrmValidation.NormalizeFlag(dto.IsActive ?? 0, entity.IsActive ?? 0, "is_active");
             entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
             return entity;
@@ -111,16 +111,16 @@ public class Hrm1007Service : IHrm1007Service
                 IsProratable = HrmValidation.NormalizeFlag(dto.IsProratable, 1, "is_proratable"),
                 IsAttendanceDependent = HrmValidation.NormalizeFlag(dto.IsAttendanceDependent, 0, "is_attendance_dependent"),
                 IsRegular = HrmValidation.NormalizeFlag(dto.IsRegular, 1, "is_regular"),
-                IsTaxable = HrmValidation.NormalizeFlag(dto.IsTaxable, 1, "is_taxable"),
-                AffectsNet = HrmValidation.NormalizeFlag(dto.AffectsNet, 1, "affects_net"),
-                IsStatutory = HrmValidation.NormalizeFlag(dto.IsStatutory, 0, "is_statutory"),
+                IsTaxable = HrmValidation.NormalizeFlag(dto.IsTaxable ?? 0, 1, "is_taxable"),
+                AffectsNet = HrmValidation.NormalizeFlag(dto.AffectsNet ?? 0, 1, "affects_net"),
+                IsStatutory = HrmValidation.NormalizeFlag(dto.IsStatutory ?? 0, 0, "is_statutory"),
                 CountryCode = TrimToNull(dto.CountryCode),
                 GlAccountCode = TrimToNull(dto.GlAccountCode),
                 DisplayOrder = dto.DisplayOrder,
                 RoundingMode = dto.RoundingMode,
                 RoundingScale = dto.RoundingScale,
                 Remarks = dto.Remarks,
-                IsActive = HrmValidation.NormalizeFlag(dto.IsActive, 1, "is_active"),
+                IsActive = HrmValidation.NormalizeFlag(dto.IsActive ?? 0, 1, "is_active"),
                 IsDeleted = 0,
                 CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow
             };

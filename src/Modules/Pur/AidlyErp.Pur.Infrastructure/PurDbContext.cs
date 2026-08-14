@@ -1,5 +1,6 @@
 using AidlyErp.Pur.Application.Interfaces;
 using AidlyErp.Pur.Domain;
+using AidlyErp.Sys.Domain;
 using AidlyErp.Shared.Core.Security;
 using AidlyErp.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,8 @@ public class PurDbContext : ModuleDbContext, IPurDbContext
     public DbSet<PurPaymentAlloc> PurPaymentAllocs => Set<PurPaymentAlloc>();
     public DbSet<PurLandedCost> PurLandedCosts => Set<PurLandedCost>();
     public DbSet<PurLandedCostAlloc> PurLandedCostAllocs => Set<PurLandedCostAlloc>();
+
+    public DbSet<VatTax> VatTaxes => Set<VatTax>();
 
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
