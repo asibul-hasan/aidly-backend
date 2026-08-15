@@ -118,7 +118,15 @@ public class SchemaDriftTests
                     // A non-nullable CLR property over a nullable column throws
                     // InvalidCastException ("Column 'x' is null") the first time a row actually
                     // holds a null — invisible to the build and to an existence-only check.
-                    if (dbNullable && !prop.IsNullable)
+                    //
+                    // Computed columns are exempt. Postgres reports a GENERATED ALWAYS column as
+                    // nullable regardless of whether its expression can produce null, so a
+                    // read-only property over one trips this check forever with nothing to fix.
+                    bool isComputed = prop.ValueGenerated == Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.OnAddOrUpdate
+                                      && prop.GetComputedColumnSql() is not null
+                                      || prop.ValueGenerated == Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.OnAddOrUpdate;
+
+                    if (dbNullable && !prop.IsNullable && !isComputed)
                     {
                         nullability.Add($"{table}.{col}  ({entity.ClrType.Name}.{prop.Name}) "
                                         + "is NOT NULL in code but NULLABLE in the database");
