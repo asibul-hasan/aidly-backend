@@ -10,15 +10,17 @@ namespace AidlyErp.Api.Controllers.Pur;
 public class Pur1104Controller : ApiControllerBase
 {
     private readonly IPur1104Service _service;
-    private readonly IPur1001Service _supplierService;
-    public Pur1104Controller(IPur1104Service service, IPur1001Service supplierService)
+    private readonly IPurLookupService _lookups;
+    public Pur1104Controller(IPur1104Service service, IPurLookupService lookups)
     {
         _service = service;
-        _supplierService = supplierService;
+        _lookups = lookups;
     }
 
+    // The supplier master DTO (supplier_no/supplier_name) is the wrong shape for a dropdown — the
+    // form binds no/name, so every option rendered blank. Served from the shared option projection.
     [HttpGet("suppliers")]
-    public async Task<IActionResult> GetSuppliers() => OkResponse(await _supplierService.GetListAsync());
+    public async Task<IActionResult> GetSuppliers() => OkResponse(await _lookups.GetSupplierOptionsAsync());
 
     [HttpGet("open-invoices")]
     public async Task<IActionResult> GetOpenInvoices([FromQuery] long supplierNo)

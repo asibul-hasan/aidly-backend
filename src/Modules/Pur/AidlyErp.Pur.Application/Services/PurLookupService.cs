@@ -14,6 +14,9 @@ namespace AidlyErp.Pur.Application.Services;
 public interface IPurLookupService
 {
     Task<Pur1102LookupDto> GetLookupsAsync(CancellationToken ct = default);
+
+    /// <summary>Supplier dropdown on its own, for the forms that need no other list.</summary>
+    Task<List<PurOptionDto>> GetSupplierOptionsAsync(CancellationToken ct = default);
 }
 
 public class PurLookupService : IPurLookupService
@@ -36,11 +39,7 @@ public class PurLookupService : IPurLookupService
 
         // Suppliers are PUR's own master; warehouses/products/UOMs come from INV through the shared
         // lookup contract, the same way SAL_1001 resolves them.
-        var suppliers = await _db.PurSuppliers.AsNoTracking()
-            .Where(s => s.CompanyNo == companyNo && s.IsDeleted == 0 && (s.IsActive == null || s.IsActive == 1))
-            .OrderBy(s => s.SupplierNo)
-            .Select(s => new PurOptionDto(s.SupplierNo, s.SupplierId + " — " + s.SupplierName))
-            .ToListAsync(ct);
+        var suppliers = await GetSupplierOptionsAsync(ct);
 
         var warehouses = await _invLookup.GetWarehousesAsync(companyNo, branchNo, ct);
         var products = await _invLookup.GetProductsAsync(companyNo, ct);
@@ -53,5 +52,16 @@ public class PurLookupService : IPurLookupService
             Products = products.Select(p => new PurOptionDto(p.No, p.Name)).ToList(),
             Uoms = uoms.Select(u => new PurOptionDto(u.No, u.Name)).ToList()
         };
+    }
+
+    public async Task<List<PurOptionDto>> GetSupplierOptionsAsync(CancellationToken ct = default)
+    {
+        long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context is required");
+
+        return await _db.PurSuppliers.AsNoTracking()
+            .Where(s => s.CompanyNo == companyNo && s.IsDeleted == 0 && (s.IsActive == null || s.IsActive == 1))
+            .OrderBy(s => s.SupplierNo)
+            .Select(s => new PurOptionDto(s.SupplierNo, s.SupplierId + " — " + s.SupplierName))
+            .ToListAsync(ct);
     }
 }
