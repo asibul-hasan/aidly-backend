@@ -384,7 +384,8 @@ public class SalPosIdempotencyTests
             Mock.Of<IFinCalendar>(),
             Mock.Of<ISalPricingService>(),
             pos,
-            Mock.Of<ISalPromotionEngine>());
+            Mock.Of<ISalPromotionEngine>(),
+            Mock.Of<IDocSequenceGenerator>());
 
     private static ICompanyBranchContext CreateContext()
     {

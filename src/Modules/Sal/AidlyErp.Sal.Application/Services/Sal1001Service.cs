@@ -56,12 +56,20 @@ public class Sal1001Service : ISal1001Service
 
     private const short MethodCash = 1;
 
+    private readonly IDocSequenceGenerator _docSeq;
+
+    /// <summary>Doc-sequence keys. POS receipts are a separate series from credit invoices —
+    /// a till roll and a credit bill are different documents to anyone reading them.</summary>
+    private const string DocSeqInvoice = "SAL_INVOICE";
+    private const string DocSeqPosReceipt = "SAL_POS_RECEIPT";
+
     public Sal1001Service(ISalDbContext db, ICompanyBranchContext ctx, ISalArLedgerService arLedger,
                           IApprovalService approvalService, IVatTaxLookup vatTaxLookup, IInvLookup invLookup,
                           IInvCatalog catalog, IInvStockPostingService stockPostingService, IFinCalendar calendar,
                           ISalPricingService pricing, ISalPosService posService,
-                          ISalPromotionEngine promotions)
+                          ISalPromotionEngine promotions, IDocSequenceGenerator docSeq)
     {
+        _docSeq = docSeq;
         _promotions = promotions;
         _db = db;
         _ctx = ctx;
@@ -124,11 +132,15 @@ public class Sal1001Service : ISal1001Service
         decimal grandTotal = subTotal + taxAmount + dto.ShippingCharge + dto.RoundOff - dto.LineDiscountTotal;
         decimal dueAmount = grandTotal - dto.PaidAmount;
 
+        // Number from the ID generator (SYS_1301) — was a timestamp overwritten by the surrogate
+        // key, so the visible number was really the table PK shared across every company.
+        string invoiceId = await _docSeq.NextAsync(companyNo, branchNo, DocSeqInvoice, "INV", 6, ct);
+
         var inv = new SalInvoice
         {
             CompanyNo = companyNo,
             BranchNo = branchNo,
-            InvoiceId = $"INV-{DateTime.UtcNow:yyyyMMddHHmmss}",
+            InvoiceId = invoiceId,
             InvoiceDate = dto.InvoiceDate != default ? dto.InvoiceDate : DateTime.UtcNow.Date,
             SaleType = dto.SaleType,
             CustomerNo = dto.CustomerNo,
@@ -153,7 +165,6 @@ public class Sal1001Service : ISal1001Service
         _db.SalInvoices.Add(inv);
         await _db.SaveChangesAsync(ct);
 
-        inv.InvoiceId = $"INV-{inv.InvoiceNo:D6}";
         await ReplaceLinesAsync(inv.InvoiceNo, companyNo, dto.Lines, ct);
         await _db.SaveChangesAsync(ct);
 
@@ -391,7 +402,12 @@ public class Sal1001Service : ISal1001Service
             return await GetDetailAsync(winner.InvoiceNo, ct);
         }
 
-        inv.InvoiceId = $"{terminal.ReceiptPrefix ?? "INV-"}{inv.InvoiceNo:D6}";
+        // Receipt number from the ID generator, keeping the till's own prefix so two registers in
+        // one shop stay distinguishable on the printed slip. Previously this was the surrogate key
+        // (inv.InvoiceNo), which is global — so tills, branches and companies all drew from one
+        // running number and no till had a sequence of its own.
+        inv.InvoiceId = await _docSeq.NextAsync(companyNo, branchNo, DocSeqPosReceipt,
+                                                terminal.ReceiptPrefix ?? "POS", 6, ct);
 
         await WritePosLinesAsync(inv.InvoiceNo, priced, ct);
         await WriteTendersAsync(inv.InvoiceNo, request.Tenders, ct);

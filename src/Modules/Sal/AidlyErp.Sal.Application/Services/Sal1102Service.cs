@@ -35,8 +35,13 @@ public class Sal1102Service : ISal1102Service
     /// <summary>AR ledger ref_doc_type for a receipt adjustment / reversal (Java AR_REF_ADJ).</summary>
     private const short ArRefAdjustment = 5;
 
-    public Sal1102Service(ISalDbContext db, ICompanyBranchContext ctx, ISalArLedgerService arLedger)
+    private readonly IDocSequenceGenerator _docSeq;
+    private const string DocSeqReceipt = "SAL_RECEIPT";
+
+    public Sal1102Service(ISalDbContext db, ICompanyBranchContext ctx, ISalArLedgerService arLedger,
+                          IDocSequenceGenerator docSeq)
     {
+        _docSeq = docSeq;
         _db = db;
         _ctx = ctx;
         _arLedger = arLedger;
@@ -116,11 +121,14 @@ public class Sal1102Service : ISal1102Service
         }
         else
         {
+            // Number from the ID generator (SYS_1301), per company/branch/year.
+            string receiptId = await _docSeq.NextAsync(companyNo, branchNo, DocSeqReceipt, "RCT", 6, ct);
+
             r = new SalReceipt
             {
                 CompanyNo = companyNo,
                 BranchNo = branchNo,
-                ReceiptId = $"RCT-{DateTime.UtcNow:yyyyMMddHHmmss}",
+                ReceiptId = receiptId,
                 ReceiptDate = dto.ReceiptDate != default ? dto.ReceiptDate : DateTime.UtcNow.Date,
                 CustomerNo = dto.CustomerNo,
                 PaymentMethod = dto.PaymentMethod,
@@ -138,7 +146,6 @@ public class Sal1102Service : ISal1102Service
             };
             _db.SalReceipts.Add(r);
             await _db.SaveChangesAsync(ct);
-            r.ReceiptId = $"RCT-{r.ReceiptNo:D6}";
         }
 
         if (dto.Allocations != null && dto.Allocations.Count > 0)

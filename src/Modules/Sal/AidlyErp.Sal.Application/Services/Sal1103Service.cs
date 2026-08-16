@@ -54,9 +54,14 @@ public class Sal1103Service : ISal1103Service
     private readonly IInvStockPostingService _stockPostingService;
     private readonly IFinCalendar _calendar;
 
+    private readonly IDocSequenceGenerator _docSeq;
+    private const string DocSeqReturn = "SAL_RETURN";
+
     public Sal1103Service(ISalDbContext db, ICompanyBranchContext ctx, ISalArLedgerService arLedger,
-                          IInvCatalog catalog, IInvStockPostingService stockPostingService, IFinCalendar calendar)
+                          IInvCatalog catalog, IInvStockPostingService stockPostingService,
+                          IFinCalendar calendar, IDocSequenceGenerator docSeq)
     {
+        _docSeq = docSeq;
         _catalog = catalog;
         _stockPostingService = stockPostingService;
         _calendar = calendar;
@@ -120,11 +125,16 @@ public class Sal1103Service : ISal1103Service
         }
         else
         {
+            // Number from the ID generator (SYS_1301), not a timestamp and not the surrogate key.
+            // The old code wrote a timestamp, saved, then overwrote with RET-{ReturnNo:D6} — so the
+            // number was really the table PK, shared across every company and branch.
+            string returnId = await _docSeq.NextAsync(companyNo, branchNo, DocSeqReturn, "RET", 6, ct);
+
             ret = new SalReturn
             {
                 CompanyNo = companyNo,
                 BranchNo = branchNo,
-                ReturnId = $"RET-{DateTime.UtcNow:yyyyMMddHHmmss}",
+                ReturnId = returnId,
                 ReturnDate = dto.ReturnDate != default ? dto.ReturnDate : DateTime.UtcNow.Date,
                 OriginalInvoiceNo = dto.InvoiceNo,
                 CustomerNo = dto.CustomerNo,
@@ -141,7 +151,6 @@ public class Sal1103Service : ISal1103Service
             };
             _db.SalReturns.Add(ret);
             await _db.SaveChangesAsync(ct);
-            ret.ReturnId = $"RET-{ret.ReturnNo:D6}";
         }
 
         await ReplaceLinesAsync(ret.ReturnNo, companyNo, dto.Lines, ct);

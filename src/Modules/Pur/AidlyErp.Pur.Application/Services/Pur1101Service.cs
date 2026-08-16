@@ -37,13 +37,19 @@ public class Pur1101Service : IPur1101Service
     public const string DocType = "PUR_PO";
     private const short StDraft = 1, StSubmitted = 2, StApproved = 3, StCancelled = 7;
 
+    private readonly IDocSequenceGenerator _docSeq;
+
+    /// <summary>Doc-sequence key for purchase orders.</summary>
+    private const string DocSeqKey = "PUR_ORDER";
+
     public Pur1101Service(IPurDbContext db, ICompanyBranchContext ctx, IApprovalService approvalService,
-                          IInvCatalog catalog)
+                          IInvCatalog catalog, IDocSequenceGenerator docSeq)
     {
         _db = db;
         _ctx = ctx;
         _approvalService = approvalService;
         _catalog = catalog;
+        _docSeq = docSeq;
     }
 
     public async Task<List<Pur1101OrderDto>> GetListAsync(CancellationToken ct = default)
@@ -121,12 +127,17 @@ public class Pur1101Service : IPur1101Service
         }
         else
         {
+            // Was $"PO-{DateTime.UtcNow.Ticks}", which produced ids like PO-639224877667180407:
+            // unreadable, unsortable by eye, and outside the numbering scheme every other document
+            // uses. A purchase order is quoted to suppliers, so it needs a real sequence.
+            string orderId = await _docSeq.NextAsync(companyNo, branchNo, DocSeqKey, "PO", 6, ct);
+
             order = new PurOrder
             {
                 CompanyNo = companyNo,
                 BranchNo = branchNo,
                 Status = StDraft,
-                OrderId = $"PO-{DateTime.UtcNow.Ticks}",
+                OrderId = orderId,
                 IsDeleted = 0,
                 CreatedBy = _ctx.CurrentUserNo(),
                 CreatedAt = DateTime.UtcNow
@@ -326,10 +337,19 @@ public class Pur1101Service : IPur1101Service
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Loads a PO <b>tracked</b>. It used to be AsNoTracking, which made every state transition a
+    /// no-op: submit, approve, reject and cancel all mutated a detached entity, so SaveChanges
+    /// wrote nothing and each endpoint still returned 200. A submitted PO stayed Draft and the
+    /// approval chain could never start — the API reported success the whole way.
+    ///
+    /// <para>Reads that genuinely do not mutate use their own AsNoTracking projections; this
+    /// helper is only reached from the write paths.</para>
+    /// </summary>
     private async Task<PurOrder> RequireAsync(long orderNo, CancellationToken ct)
     {
         var companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context is required");
-        var order = await _db.PurOrders.AsNoTracking()
+        var order = await _db.PurOrders
             .FirstOrDefaultAsync(o => o.OrderNo == orderNo && o.IsDeleted == 0, ct)
             ?? throw new NotFoundException($"PO not found: orderNo={orderNo}");
         if (order.CompanyNo != companyNo) throw new ValidationException("PO belongs to another company");

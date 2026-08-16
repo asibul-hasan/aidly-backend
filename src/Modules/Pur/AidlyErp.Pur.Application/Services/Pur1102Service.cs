@@ -134,19 +134,32 @@ public class Pur1102Service : IPur1102Service
         }
         else
         {
+            // The number is drawn BEFORE the insert, not stamped over a "TEMP" placeholder after.
+            // The old order left a row literally called "TEMP" if anything failed in between.
+            string invoiceId = await _docSeq.NextAsync(companyNo, branchNo, DocSeq, "PINV", 6, ct);
+
             inv = new PurInvoice
             {
                 CompanyNo = companyNo,
                 BranchNo = branchNo,
                 Status = StDraft,
                 ReceiveMode = 1,
-                InvoiceId = "TEMP",
+                InvoiceId = invoiceId,
+                // pur_invoice.fin_year_no is NOT NULL. The period guard above already resolved the
+                // year; not carrying it onto the entity meant no purchase invoice could ever be
+                // saved. Same defect as the POS sale had.
+                FinYearNo = finYear.FinYearNo,
+                FinPeriodNo = finPeriod.FinPeriodNo,
+                // Also NOT NULL, and it was only assigned further down — after this insert had
+                // already been attempted and failed.
+                SupplierInvoiceNo = dto.SupplierInvoiceNo?.Trim(),
+                SupplierNo = dto.SupplierNo,
+                InvoiceDate = invDate,
                 IsActive = 1, IsDeleted = 0,
                 CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow
             };
             _db.PurInvoices.Add(inv);
             await _db.SaveChangesAsync(ct);
-            inv.InvoiceId = await _docSeq.NextAsync(companyNo, branchNo, DocSeq, "PINV", 6, ct);
         }
 
         // Duplicate supplier bill guard
@@ -509,10 +522,15 @@ public class Pur1102Service : IPur1102Service
         return inv.PaidAmount >= inv.GrandTotal ? (short)3 : (short)2;
     }
 
+    /// <summary>
+    /// Loads an invoice <b>tracked</b>. SubmitAsync and RejectAsync mutate what this returns, and
+    /// with AsNoTracking those mutations went to a detached entity — SaveChanges wrote nothing
+    /// while the endpoint still returned 200. Same defect PUR_1101 had on its approval path.
+    /// </summary>
     private async Task<PurInvoice> RequireAsync(long invoiceNo, CancellationToken ct)
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context required");
-        var i = await _db.PurInvoices.AsNoTracking()
+        var i = await _db.PurInvoices
             .FirstOrDefaultAsync(x => x.InvoiceNo == invoiceNo && x.IsDeleted == 0, ct)
             ?? throw new NotFoundException($"Invoice not found: {invoiceNo}");
         if (i.CompanyNo != companyNo) throw new ValidationException("Invoice belongs to another company");

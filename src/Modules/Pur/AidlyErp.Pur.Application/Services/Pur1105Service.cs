@@ -197,18 +197,25 @@ public class Pur1105Service : IPur1105Service
         }
         else
         {
+            // Number drawn before the insert — never a "TEMP" placeholder that a failure could leave
+            // behind as the permanent id.
+            string receiptId = await _docSeq.NextAsync(companyNo, branchNo, DocSeqType, "GRN", 6, ct);
+
             receipt = new PurReceipt
             {
                 CompanyNo = companyNo,
                 BranchNo = branchNo,
                 Status = StDraft,
-                ReceiptId = "TEMP",
+                ReceiptId = receiptId,
+                // pur_receipt.fin_year_no is NOT NULL. The guard above already resolved the year
+                // for this receipt date; not carrying it onto the entity meant no goods receipt
+                // could be saved at all — the same defect the POS sale and purchase invoice had.
+                FinYearNo = finYear.FinYearNo,
                 IsActive = 1, IsDeleted = 0,
                 CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow
             };
             _db.PurReceipts.Add(receipt);
             await _db.SaveChangesAsync(ct);
-            receipt.ReceiptId = await _docSeq.NextAsync(companyNo, branchNo, DocSeqType, "GRN", 6, ct);
         }
 
         receipt.ReceiptDate = rcptDate;
