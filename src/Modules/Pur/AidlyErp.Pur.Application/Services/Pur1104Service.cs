@@ -89,7 +89,10 @@ public class Pur1104Service : IPur1104Service
                         && i.SupplierNo == supplierNo && i.IsDeleted == 0
                         && (i.Status == InvPosted || i.Status == InvPartRet)
                         && i.DueAmount > 0)
-            .OrderByDescending(i => i.InvoiceNo)
+            // OLDEST first. PUR_1104's Auto-allocate walks this list in order and the form states
+            // it "applies it to the oldest dues first"; ordering newest-first made it settle the
+            // newest invoice and leave the oldest debt standing — the opposite of FIFO settlement.
+            .OrderBy(i => i.InvoiceDate).ThenBy(i => i.InvoiceNo)
             .Select(i => new Pur1104OpenInvoiceDto
             {
                 InvoiceNo = i.InvoiceNo,

@@ -40,9 +40,12 @@ public class Pur1002Service : IPur1002Service
         long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context is required");
         var supplier = await RequireSupplierAsync(supplierNo, companyNo, ct);
 
+        // Order by the MAPPED key. SupProdNo is a [NotMapped] alias for SupplierProductNo, so EF
+        // cannot translate it — using it here made every price-list read fail with a LINQ
+        // translation error, i.e. the whole form 500'd.
         var rows = await _db.PurSupplierProducts.AsNoTracking()
             .Where(p => p.SupplierNo == supplierNo && p.IsDeleted == 0)
-            .OrderBy(p => p.SupProdNo)
+            .OrderBy(p => p.SupplierProductNo)
             .ToListAsync(ct);
 
         var productNos = rows.Select(r => r.ProductNo).Distinct().ToList();
@@ -50,7 +53,7 @@ public class Pur1002Service : IPur1002Service
 
         return rows.Select(p => new Pur1002PriceRowDto
         {
-            SupplierProductNo = p.SupProdNo,
+            SupplierProductNo = p.SupplierProductNo,
             SupplierNo = p.SupplierNo,
             SupplierName = supplier.SupplierName,
             ProductNo = p.ProductNo,
@@ -131,13 +134,13 @@ public class Pur1002Service : IPur1002Service
 
             // New rows need their PK before they can be marked as kept.
             await _db.SaveChangesAsync(ct);
-            kept.Add(row.SupProdNo);
+            kept.Add(row.SupplierProductNo);
         }
 
         // Soft-delete rows not in the new list.
         foreach (var row in existing)
         {
-            if (!kept.Contains(row.SupProdNo))
+            if (!kept.Contains(row.SupplierProductNo))
             {
                 row.PerformSoftDelete(_ctx.CurrentUserNo());
             }
@@ -151,7 +154,7 @@ public class Pur1002Service : IPur1002Service
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context is required");
         var row = await _db.PurSupplierProducts
-            .FirstOrDefaultAsync(p => p.SupProdNo == rowNo && p.IsDeleted == 0, ct)
+            .FirstOrDefaultAsync(p => p.SupplierProductNo == rowNo && p.IsDeleted == 0, ct)
             ?? throw new NotFoundException($"Supplier price row not found: {rowNo}");
 
         // Verify the supplier belongs to the current company.
