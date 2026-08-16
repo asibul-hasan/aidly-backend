@@ -1,3 +1,4 @@
+using AidlyErp.Shared.Core.Numbering;
 using AidlyErp.Sys.Application.Interfaces;
 using AidlyErp.Sys.Contracts;
 using AidlyErp.Sys.Domain;
@@ -135,37 +136,109 @@ internal sealed class SysSettingsStore : ISysSettingsStore
 /// <summary>SYS's side of <see cref="IDocSequenceGenerator"/>.</summary>
 internal sealed class DocSequenceGenerator : IDocSequenceGenerator
 {
+    private const short Deleted = 0;
+
     private readonly ISysDbContext _db;
 
     public DocSequenceGenerator(ISysDbContext db) => _db = db;
 
+    /// <summary>
+    /// Hands out the next document number for a series, honouring whatever SYS_1301 has configured
+    /// for it — pattern, prefix, suffix, padding, starting number and yearly reset.
+    ///
+    /// <para>The <paramref name="prefix"/> and <paramref name="width"/> arguments are only defaults
+    /// used to SEED a series the first time it is asked for. Once the row exists, the configuration
+    /// on it wins: that is the whole point of the setup form, and previously these arguments
+    /// overrode it on every call, so the form's settings did nothing.</para>
+    /// </summary>
     public async Task<string> NextAsync(long companyNo, long? branchNo, string docType, string prefix,
                                         int width = 4, CancellationToken cancellationToken = default)
     {
         var seq = await _db.DocSequences.FirstOrDefaultAsync(
-            s => s.CompanyNo == companyNo && s.BranchNo == branchNo && s.DocType == docType, cancellationToken);
+            s => s.CompanyNo == companyNo && s.BranchNo == branchNo && s.DocType == docType
+                 && s.IsDeleted == Deleted, cancellationToken);
 
         if (seq == null)
         {
-            // First document of this type: create the sequence already pointing at 2, and hand out 1.
-            _db.DocSequences.Add(new DocSequence
+            // First document of this type — seed the series from the caller's defaults so a company
+            // that has not visited SYS_1301 still gets sensible numbers.
+            seq = new DocSequence
             {
                 CompanyNo = companyNo,
                 BranchNo = branchNo,
                 DocType = docType,
                 Prefix = prefix,
-                NextVal = 2,
-            });
-
-            await _db.SaveChangesAsync(cancellationToken);
-            return prefix + 1L.ToString(new string('0', width));
+                Padding = (short)width,
+                StartingNo = 1,
+                NextVal = 1,
+                IsActive = 1,
+                IsDeleted = Deleted,
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.DocSequences.Add(seq);
         }
 
-        var current = seq.NextVal;
+        // reset_policy 1 = restart the count each financial year. Series carrying a fin_year_no that
+        // is no longer the current one start again at starting_no rather than running on.
+        if (seq.ResetPolicy == ResetYearly)
+        {
+            var currentYear = await CurrentFinYearAsync(companyNo, cancellationToken);
+            if (currentYear is not null && seq.FinYearNo != currentYear.FinYearNo)
+            {
+                seq.FinYearNo = currentYear.FinYearNo;
+                seq.NextVal = seq.StartingNo > 0 ? seq.StartingNo : 1;
+            }
+        }
+
+        long current = seq.NextVal > 0 ? seq.NextVal : (seq.StartingNo > 0 ? seq.StartingNo : 1);
         seq.NextVal = current + 1;
+        seq.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
 
-        return prefix + current.ToString(new string('0', width));
+        return await FormatAsync(seq, current, companyNo, branchNo, cancellationToken);
+    }
+
+    /// <summary>reset_policy 1 = yearly. 2 = never (the default).</summary>
+    private const short ResetYearly = 1;
+
+    private async Task<FinYear?> CurrentFinYearAsync(long companyNo, CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        return await _db.FinYears.AsNoTracking()
+            .Where(y => y.CompanyNo == companyNo && y.IsDeleted == Deleted
+                        && y.StartDate <= today && y.EndDate >= today)
+            .OrderBy(y => y.FinYearNo)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    /// <summary>
+    /// A configured pattern wins; otherwise the number falls back to prefix + padded counter +
+    /// suffix, which is what every series produced before patterns existed.
+    /// </summary>
+    private async Task<string> FormatAsync(DocSequence seq, long value, long companyNo,
+                                           long? branchNo, CancellationToken ct)
+    {
+        int pad = seq.Padding > 0 ? seq.Padding : 6;
+
+        if (string.IsNullOrWhiteSpace(seq.Pattern))
+            return (seq.Prefix ?? string.Empty) + value.ToString(new string('0', pad)) + seq.Suffix;
+
+        var year = await CurrentFinYearAsync(companyNo, ct);
+
+        string? companyCode = await _db.Companies.AsNoTracking()
+            .Where(c => c.CompanyNo == companyNo).Select(c => c.CompanyId).FirstOrDefaultAsync(ct);
+
+        string? branchCode = branchNo is null ? null : await _db.Branches.AsNoTracking()
+            .Where(b => b.BranchNo == branchNo).Select(b => b.BranchId).FirstOrDefaultAsync(ct);
+
+        return IdPatternResolver.Resolve(seq.Pattern, new IdPatternResolver.Ctx(
+            DocDate: DateOnly.FromDateTime(DateTime.UtcNow.Date),
+            BranchCode: branchCode,
+            CompanyCode: companyCode,
+            DocSubType: string.IsNullOrWhiteSpace(seq.DocSubType) ? seq.DocType : seq.DocSubType,
+            FiscalYearStart: year?.StartDate.Year,
+            FiscalYearEnd: year?.EndDate.Year,
+            SequenceValue: value));
     }
 }
 

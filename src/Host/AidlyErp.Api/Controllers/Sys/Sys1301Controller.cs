@@ -4,7 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AidlyErp.Api.Controllers.Sys;
 
-/// <summary>SYS_1301 Document ID Generator — how each form numbers its documents.</summary>
+/// <summary>
+/// SYS_1301 ID Generator setup — configures the document-number series that
+/// <c>DocSequenceGenerator</c> issues from. Nothing here hands out a number.
+/// </summary>
 [Route("api/sys/1301")]
 [Route("api/v1/sys/forms/sys1301")]
 public class Sys1301Controller : ApiControllerBase
@@ -14,33 +17,33 @@ public class Sys1301Controller : ApiControllerBase
 
     /// <summary>Configured series, optionally narrowed to one form.</summary>
     [HttpGet("configs")]
-    public async Task<IActionResult> GetConfigs([FromQuery] long? menuNo)
+    public async Task<IActionResult> GetConfigs([FromQuery(Name = "menu_no")] long? menuNo)
         => OkResponse(await _service.GetListAsync(menuNo));
 
-    /// <summary>Every form a series can be attached to, grouped module → submodule → form.</summary>
+    /// <summary>Forms a series can be attached to.</summary>
     [HttpGet("menu-options")]
     public async Task<IActionResult> GetMenuOptions() => OkResponse(await _service.GetMenuOptionsAsync());
 
     [HttpGet("fin-year-options")]
     public async Task<IActionResult> GetFinYearOptions() => OkResponse(await _service.GetFinYearOptionsAsync());
 
-    /// <summary>The tokens a pattern may use, for the form's help text.</summary>
+    /// <summary>Every token a pattern may use, for the form's help text.</summary>
     [HttpGet("tokens")]
-    public IActionResult GetTokens() => OkResponse(_service.GetTokens());
+    public IActionResult GetTokens() => OkResponse(_service.GetSupportedTokens());
 
-    /// <summary>Renders a sample number so the pattern can be checked before it is saved.</summary>
+    /// <summary>Renders a pattern against sample context, so the shape is visible before saving.</summary>
     [HttpPost("preview")]
-    public async Task<IActionResult> Preview([FromBody] Sys1301PreviewRequestDto request)
-        => OkResponse(await _service.PreviewAsync(request));
+    public IActionResult Preview([FromBody] Sys1301PreviewRequestDto request)
+        => OkResponse(_service.Preview(request));
 
     [HttpPost("configs")]
     public async Task<IActionResult> Save([FromBody] Sys1301IdGeneratorDto dto)
-        => OkResponse(await _service.SaveAsync(dto), "Sequence saved");
+        => OkResponse(await _service.SaveAsync(dto), "ID generator configuration saved");
 
     [HttpDelete("configs/{docSequenceNo:long}")]
     public async Task<IActionResult> Delete(long docSequenceNo)
     {
         await _service.DeleteAsync(docSequenceNo);
-        return OkResponse("Sequence deleted");
+        return OkResponse("ID generator configuration deleted");
     }
 }

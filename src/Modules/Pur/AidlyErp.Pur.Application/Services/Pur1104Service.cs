@@ -210,6 +210,11 @@ public class Pur1104Service : IPur1104Service
             Amount = amount,
             AllocatedAmount = allocated,
             UnallocatedAmount = amount - allocated,
+            // NOT NULL in pur_payment. The period guard above already resolved both; not carrying
+            // them onto the entity meant no supplier payment could be saved. Fifth occurrence of
+            // this same defect across the modules.
+            FinYearNo = finYear.FinYearNo,
+            FinPeriodNo = finPeriod.FinPeriodNo,
             Remarks = dto.Remarks,
             Status = StPosted,
             IsActive = 1, IsDeleted = 0,

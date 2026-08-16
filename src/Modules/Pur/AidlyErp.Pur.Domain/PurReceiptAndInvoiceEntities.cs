@@ -505,6 +505,12 @@ public class PurPayment : AuditEntity
     [Column("amount")]
     public decimal Amount { get; set; } = 0m;
 
+    // pur_payment.exchange_rate is NOT NULL and was not mapped at all, so every payment
+    // insert failed. Single-currency for now, hence the 1m default — the column exists so a
+    // foreign-currency payment can carry its rate later.
+    [Column("exchange_rate")]
+    public decimal ExchangeRate { get; set; } = 1m;
+
     [Column("allocated_amount")]
     public decimal AllocatedAmount { get; set; } = 0m;
 

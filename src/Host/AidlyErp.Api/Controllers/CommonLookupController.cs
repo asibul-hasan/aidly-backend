@@ -334,7 +334,7 @@ public class CommonLookupController : ApiControllerBase, IActionFilter
             var data = await _hrm.HrmGradeSteps
                 .AsNoTracking()
                 .Where(x => x.IsDeleted == 0 && x.GradeNo == gradeNo)
-                .Select(x => new { id = x.GradeStepNo,  grade_step_no = x.GradeStepNo, name = x.StepName, amount = x.BasicSalary })
+                .Select(x => new { id = x.GradeStepNo,  no = x.GradeStepNo,  grade_step_no = x.GradeStepNo, name = x.StepName, amount = x.BasicSalary })
                 .ToListAsync();
             _cache.Set(cacheKey, data, CacheDuration);
             return OkResponse(data);
@@ -419,7 +419,7 @@ public class CommonLookupController : ApiControllerBase, IActionFilter
         try
         {
             var data = await _inv.InvWarehouses.AsNoTracking().Where(x => x.IsDeleted == 0)
-                .Select(x => new { id = x.WarehouseNo,  warehouse_no = x.WarehouseNo, code = x.WarehouseId, name = x.WarehouseName }).ToListAsync();
+                .Select(x => new { id = x.WarehouseNo,  no = x.WarehouseNo,  warehouse_no = x.WarehouseNo, code = x.WarehouseId, name = x.WarehouseName }).ToListAsync();
             return OkResponse(data);
         }
         catch { return OkResponse(new List<object>()); }
@@ -430,7 +430,11 @@ public class CommonLookupController : ApiControllerBase, IActionFilter
         try
         {
             var data = await _inv.InvProducts.AsNoTracking().Where(x => x.IsDeleted == 0)
-                .Select(x => new { id = x.ProductNo,  product_no = x.ProductNo, code = x.ProductId, name = x.ProductName }).ToListAsync();
+            // Every ng-select in PUR/SAL/INV binds bindValue="no" (31 places across 10 forms),
+            // so a lookup without it binds undefined: the label renders, the value does not, and
+            // the form refuses to add the line. The typed alias (product_no, supplier_no, …) is kept
+            // for callers that already read it.
+                .Select(x => new { id = x.ProductNo,  no = x.ProductNo,  product_no = x.ProductNo, code = x.ProductId, name = x.ProductName }).ToListAsync();
             return OkResponse(data);
         }
         catch { return OkResponse(new List<object>()); }
@@ -441,7 +445,7 @@ public class CommonLookupController : ApiControllerBase, IActionFilter
         try
         {
             var data = await _inv.InvUoms.AsNoTracking().Where(x => x.IsDeleted == 0)
-                .Select(x => new { id = x.UomNo,  uom_no = x.UomNo, code = x.UomId, name = x.UomName }).ToListAsync();
+                .Select(x => new { id = x.UomNo,  no = x.UomNo,  uom_no = x.UomNo, code = x.UomId, name = x.UomName }).ToListAsync();
             return OkResponse(data);
         }
         catch { return OkResponse(new List<object>()); }
@@ -452,7 +456,7 @@ public class CommonLookupController : ApiControllerBase, IActionFilter
         try
         {
             var data = await _fin.FinAccounts.AsNoTracking().Where(x => x.IsDeleted == 0)
-                .Select(x => new { id = x.AccountNo,  account_no = x.AccountNo, code = x.AccountCode, name = x.AccountName }).ToListAsync();
+                .Select(x => new { id = x.AccountNo,  no = x.AccountNo,  account_no = x.AccountNo, code = x.AccountCode, name = x.AccountName }).ToListAsync();
             return OkResponse(data);
         }
         catch { return OkResponse(new List<object>()); }
@@ -463,7 +467,7 @@ public class CommonLookupController : ApiControllerBase, IActionFilter
         try
         {
             var data = await _pur.PurSuppliers.AsNoTracking().Where(x => x.IsDeleted == 0)
-                .Select(x => new { id = x.SupplierNo,  supplier_no = x.SupplierNo, code = x.SupplierId, name = x.SupplierName }).ToListAsync();
+                .Select(x => new { id = x.SupplierNo,  no = x.SupplierNo,  supplier_no = x.SupplierNo, code = x.SupplierId, name = x.SupplierName }).ToListAsync();
             return OkResponse(data);
         }
         catch { return OkResponse(new List<object>()); }
@@ -474,7 +478,7 @@ public class CommonLookupController : ApiControllerBase, IActionFilter
         try
         {
             var data = await _sal.SalCustomers.AsNoTracking().Where(x => x.IsDeleted == 0)
-                .Select(x => new { id = x.CustomerNo,  customer_no = x.CustomerNo, code = x.CustomerId, name = x.CustomerName }).ToListAsync();
+                .Select(x => new { id = x.CustomerNo,  no = x.CustomerNo,  customer_no = x.CustomerNo, code = x.CustomerId, name = x.CustomerName }).ToListAsync();
             return OkResponse(data);
         }
         catch { return OkResponse(new List<object>()); }
