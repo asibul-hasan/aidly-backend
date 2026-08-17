@@ -344,6 +344,13 @@ public class Pur1102LineDto
     [JsonPropertyName("invoice_dtl_no")]
     public long? InvoiceDtlNo { get; set; }
 
+    /// <summary>
+    /// Set when this line bills a goods-receipt line. Drives the three-way match: the line then
+    /// clears GRN clearing instead of posting stock and debiting Inventory a second time.
+    /// </summary>
+    [JsonPropertyName("receipt_dtl_no")]
+    public long? ReceiptDtlNo { get; set; }
+
     [JsonPropertyName("product_no")]
     public long ProductNo { get; set; }
 
@@ -944,4 +951,51 @@ public class Pur1106LandedCostDto
 
     [JsonPropertyName("allocations")]
     public List<Pur1106AllocDto> Allocations { get; set; } = new();
+}
+
+/// <summary>
+/// A posted goods-receipt line that is still waiting to be billed. PUR_1102 offers these so an
+/// invoice can be raised against real receipts — the link is what stops the invoice re-posting
+/// stock the GRN already took in.
+/// </summary>
+public class Pur1102ReceiptLineDto
+{
+    [JsonPropertyName("receipt_dtl_no")]
+    public long ReceiptDtlNo { get; set; }
+
+    [JsonPropertyName("receipt_no")]
+    public long ReceiptNo { get; set; }
+
+    [JsonPropertyName("receipt_id")]
+    public string? ReceiptId { get; set; }
+
+    [JsonPropertyName("receipt_date")]
+    public DateTime ReceiptDate { get; set; }
+
+    [JsonPropertyName("product_no")]
+    public long ProductNo { get; set; }
+
+    [JsonPropertyName("product_name")]
+    public string? ProductName { get; set; }
+
+    [JsonPropertyName("uom_no")]
+    public long UomNo { get; set; }
+
+    [JsonPropertyName("qty")]
+    public decimal Qty { get; set; }
+
+    [JsonPropertyName("unit_cost")]
+    public decimal UnitCost { get; set; }
+
+    [JsonPropertyName("tax_rate_pct")]
+    public decimal TaxRatePct { get; set; }
+
+    [JsonPropertyName("batch_no")]
+    public long? BatchNo { get; set; }
+
+    [JsonPropertyName("batch_code")]
+    public string? BatchCode { get; set; }
+
+    [JsonPropertyName("warehouse_no")]
+    public long WarehouseNo { get; set; }
 }

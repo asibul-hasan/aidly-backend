@@ -279,6 +279,17 @@ public class PurInvoiceDtl : AuditEntity
     [Column("invoice_no")]
     public long InvoiceNo { get; set; }
 
+    /// <summary>
+    /// The goods-receipt line this invoice line bills for, when the goods arrived on a GRN.
+    ///
+    /// This is what makes the three-way match work. A GRN already took the goods into stock and
+    /// credited GRN clearing, so an invoice line that points at one must NOT move stock again —
+    /// it clears the accrual instead (Dr GRN clearing / Cr AP). Null means the one-step path:
+    /// the invoice is itself the receipt, so it posts stock (Dr Inventory / Cr AP).
+    /// </summary>
+    [Column("receipt_dtl_no")]
+    public long? ReceiptDtlNo { get; set; }
+
     [Column("line_no")]
     public int LineNo { get; set; }
 

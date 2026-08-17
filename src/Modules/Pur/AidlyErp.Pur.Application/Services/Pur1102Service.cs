@@ -24,6 +24,9 @@ public interface IPur1102Service
     Task ApplyApprovalOutcomeAsync(long invoiceNo, bool approved, CancellationToken ct = default);
     Task<Pur1102InvoiceDto> CancelAsync(long invoiceNo, string? reason, CancellationToken ct = default);
     Task DeleteAsync(long invoiceNo, CancellationToken ct = default);
+
+    /// <summary>Posted receipt lines for a supplier that no live invoice has billed yet.</summary>
+    Task<List<Pur1102ReceiptLineDto>> GetUninvoicedReceiptLinesAsync(long supplierNo, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -46,6 +49,9 @@ public class Pur1102Service : IPur1102Service
 
     public const string DocType = "PUR_INVOICE";
     private const short StDraft = 1, StPosted = 2, StReturned = 4, StCancelled = 5;
+
+    /// <summary>pur_receipt.status for a posted GRN — only those carry a clearable accrual.</summary>
+    private const short RcvPosted = 2;
     private const short MvPurchase = 2;
     private const short RefPurInv = 2;
     private const short ApRefInvoice = 2, ApRefAdj = 5;
@@ -230,6 +236,7 @@ public class Pur1102Service : IPur1102Service
             {
                 InvoiceNo = inv.InvoiceNo,
                 LineNo = lineNo++,
+                ReceiptDtlNo = r.ReceiptDtlNo,
                 ProductNo = product.ProductNo,
                 VariantNo = r.VariantNo,
                 UomNo = r.UomNo ?? product.BaseUomNo,
@@ -293,6 +300,8 @@ public class Pur1102Service : IPur1102Service
         var lines = await _db.PurInvoiceDtls.Where(l => l.InvoiceNo == invoiceNo && l.IsDeleted == 0).ToListAsync(ct);
         if (lines.Count == 0) throw new ValidationException("Add at least one line before submitting");
 
+        await AssertReceiptLinesNotAlreadyInvoicedAsync(invoiceNo, lines, ct);
+
         if (inv.ApprovalRequestNo == null)
         {
             var outcome = await _approvalService.RaiseAsync(DocType, inv.InvoiceNo, inv.InvoiceId, inv.GrandTotal, ct);
@@ -338,6 +347,78 @@ public class Pur1102Service : IPur1102Service
         }
     }
 
+    public async Task<List<Pur1102ReceiptLineDto>> GetUninvoicedReceiptLinesAsync(
+        long supplierNo, CancellationToken ct = default)
+    {
+        if (supplierNo <= 0) return new();
+        long companyNo = _ctx.CurrentCompanyNo() ?? 0;
+        long branchNo = _ctx.CurrentBranchNo() ?? 0;
+
+        // Only POSTED receipts: a draft GRN has not taken the goods into stock, so there is no
+        // accrual for an invoice to clear.
+        var rows = await (
+            from d in _db.PurReceiptDtls.AsNoTracking()
+            join r in _db.PurReceipts.AsNoTracking() on d.ReceiptNo equals r.ReceiptNo
+            where r.CompanyNo == companyNo && r.BranchNo == branchNo
+                  && r.SupplierNo == supplierNo && r.Status == RcvPosted
+                  && r.IsDeleted == 0 && d.IsDeleted == 0
+                  // not already billed by a live invoice
+                  && !_db.PurInvoiceDtls.Any(il => il.ReceiptDtlNo == d.ReceiptDtlNo
+                        && il.IsDeleted == 0
+                        && _db.PurInvoices.Any(i => i.InvoiceNo == il.InvoiceNo
+                                                    && i.IsDeleted == 0 && i.Status != StCancelled))
+            orderby r.ReceiptDate, d.ReceiptDtlNo
+            select new Pur1102ReceiptLineDto
+            {
+                ReceiptDtlNo = d.ReceiptDtlNo,
+                ReceiptNo = r.ReceiptNo,
+                ReceiptId = r.ReceiptId,
+                ReceiptDate = r.ReceiptDate,
+                ProductNo = d.ProductNo,
+                UomNo = d.UomNo,
+                Qty = d.Qty,
+                UnitCost = d.UnitCost,
+                TaxRatePct = d.TaxRatePct,
+                BatchNo = d.BatchNo,
+                BatchCode = d.BatchCode,
+                WarehouseNo = r.WarehouseNo
+            }).ToListAsync(ct);
+
+        if (rows.Count == 0) return rows;
+
+        var names = await _catalog.GetProductNamesAsync(rows.Select(r => r.ProductNo).Distinct().ToList(), ct);
+        foreach (var r in rows) r.ProductName = names.GetValueOrDefault(r.ProductNo);
+        return rows;
+    }
+
+    /// <summary>
+    /// A goods-receipt line may be billed once. Without this, two invoices could each clear the
+    /// same GRN accrual, crediting the supplier twice for one delivery and leaving GRN clearing
+    /// with a debit balance that no document explains.
+    /// </summary>
+    private async Task AssertReceiptLinesNotAlreadyInvoicedAsync(
+        long invoiceNo, List<PurInvoiceDtl> lines, CancellationToken ct)
+    {
+        var receiptDtlNos = lines.Where(l => l.ReceiptDtlNo.HasValue)
+                                 .Select(l => l.ReceiptDtlNo!.Value)
+                                 .Distinct().ToList();
+        if (receiptDtlNos.Count == 0) return;
+
+        // Cancelled invoices release their receipt lines — those goods are billable again.
+        var clash = await _db.PurInvoiceDtls.AsNoTracking()
+            .Where(l => l.InvoiceNo != invoiceNo
+                        && l.IsDeleted == 0
+                        && l.ReceiptDtlNo != null
+                        && receiptDtlNos.Contains(l.ReceiptDtlNo!.Value))
+            .Join(_db.PurInvoices.AsNoTracking().Where(i => i.IsDeleted == 0 && i.Status != StCancelled),
+                  l => l.InvoiceNo, i => i.InvoiceNo, (l, i) => new { l.ReceiptDtlNo, i.InvoiceId })
+            .FirstOrDefaultAsync(ct);
+
+        if (clash != null)
+            throw new ValidationException(
+                $"These goods were already billed on invoice {clash.InvoiceId} — remove the receipt line or cancel that invoice");
+    }
+
     /// <summary>One-step post: receive stock + credit AP + emit GL event. Idempotent on status.</summary>
     private async Task PostInternalAsync(PurInvoice inv, CancellationToken ct)
     {
@@ -360,15 +441,25 @@ public class Pur1102Service : IPur1102Service
             .OrderBy(l => l.LineNo).ToListAsync(ct);
         if (lines.Count == 0) throw new ValidationException("Nothing to post");
 
-        // (1) Stock IN
-        var legs = lines.Select((l, idx) => StockPostingLeg.In(
-            inv.WarehouseNo, l.ProductNo, l.VariantNo, l.BatchNo,
-            l.QtyBase, MvPurchase, l.InvoiceDtlNo,
-            l.FinalUnitCost > 0 ? l.FinalUnitCost : l.UnitPrice)).ToList();
+        // (1) Stock IN — ONLY for lines the invoice is itself receiving.
+        //
+        // A line carrying a receipt_dtl_no was already taken into stock by its GRN. Posting it
+        // again put the same physical goods into inventory twice: a 6-unit purchase received via
+        // GRN and then invoiced showed 12 units on hand, and Inventory was debited for double the
+        // purchase while the GRN clearing credit sat with nothing to clear it.
+        var directLines = lines.Where(l => l.ReceiptDtlNo == null).ToList();
 
-        var cmd = new StockPostingCommand(companyNo, branchNo, RefPurInv,
-            inv.InvoiceId, inv.InvoiceNo, inv.InvoiceDate, finYear.FinYearNo, null, false, legs);
-        await _stockPostingService.PostAsync(cmd, ct);
+        if (directLines.Count > 0)
+        {
+            var legs = directLines.Select(l => StockPostingLeg.In(
+                inv.WarehouseNo, l.ProductNo, l.VariantNo, l.BatchNo,
+                l.QtyBase, MvPurchase, l.InvoiceDtlNo,
+                l.FinalUnitCost > 0 ? l.FinalUnitCost : l.UnitPrice)).ToList();
+
+            var cmd = new StockPostingCommand(companyNo, branchNo, RefPurInv,
+                inv.InvoiceId, inv.InvoiceNo, inv.InvoiceDate, finYear.FinYearNo, null, false, legs);
+            await _stockPostingService.PostAsync(cmd, ct);
+        }
 
         // (2) AP subsidiary ledger
         await _apLedger.CreditAsync(inv.SupplierNo, inv.GrandTotal, ApRefInvoice, inv.InvoiceId, inv.InvoiceNo,
@@ -410,13 +501,18 @@ public class Pur1102Service : IPur1102Service
         var lines = await _db.PurInvoiceDtls.Where(l => l.InvoiceNo == invoiceNo && l.IsDeleted == 0)
             .OrderBy(l => l.LineNo).ToListAsync(ct);
 
-        var reversalLegs = lines.Select(l =>
+        // Reverse only what this invoice actually posted. A GRN-backed line never moved stock, so
+        // taking it out here would drive inventory negative against goods that are still on hand.
+        var reversalLegs = lines.Where(l => l.ReceiptDtlNo == null).Select(l =>
             StockPostingLeg.Out(inv.WarehouseNo, l.ProductNo, l.VariantNo, l.BatchNo,
                 l.QtyBase, MvPurchase, l.InvoiceDtlNo)).ToList();
 
-        var cmd = new StockPostingCommand(inv.CompanyNo, inv.BranchNo, RefPurInv,
-            inv.InvoiceId, inv.InvoiceNo, inv.InvoiceDate, finYear.FinYearNo, null, true, reversalLegs);
-        await _stockPostingService.PostAsync(cmd, ct);
+        if (reversalLegs.Count > 0)
+        {
+            var cmd = new StockPostingCommand(inv.CompanyNo, inv.BranchNo, RefPurInv,
+                inv.InvoiceId, inv.InvoiceNo, inv.InvoiceDate, finYear.FinYearNo, null, true, reversalLegs);
+            await _stockPostingService.PostAsync(cmd, ct);
+        }
 
         // (2) Reverse AP
         await _apLedger.DebitAsync(inv.SupplierNo, inv.GrandTotal, ApRefAdj, inv.InvoiceId, inv.InvoiceNo,
@@ -472,12 +568,36 @@ public class Pur1102Service : IPur1102Service
         var taxCodes = await _vatTaxLookup.GetTaxCodesAsync(taxNos, ct);
 
         decimal taxTotal = vatByTax.Sum(v => v.Amount);
-        decimal inventory = inv.SubTotal;
+
+        // Split the goods value by how the goods arrived. A GRN-backed line's value is already
+        // sitting in GRN clearing (credited when the receipt posted), so the invoice DEBITS that
+        // account to clear it rather than debiting Inventory a second time. Only lines the invoice
+        // itself receives touch Inventory.
+        //
+        // Line taxable is used rather than inv.SubTotal so a mixed invoice — some lines from a
+        // GRN, some direct — splits correctly; the two still sum to SubTotal.
+        decimal LineTaxable(PurInvoiceDtl l) => l.TaxableAmount > 0
+            ? l.TaxableAmount
+            : (l.QtyBase * l.UnitPrice) - l.DiscountAmount;
+
+        decimal grnBacked = lines.Where(l => l.ReceiptDtlNo != null).Sum(LineTaxable);
+        decimal direct = lines.Where(l => l.ReceiptDtlNo == null).Sum(LineTaxable);
+
+        // Rounding guard: whatever the lines do not account for stays on the path that owns the
+        // remainder, so the voucher still balances against GrandTotal.
+        decimal remainder = inv.SubTotal - (grnBacked + direct);
+        if (remainder != 0)
+        {
+            if (direct > 0) direct += remainder; else grnBacked += remainder;
+        }
 
         var purLegs = new List<GlPostingPayload.Leg>();
 
-        if (inventory > 0)
-            purLegs.Add(new() { LegKey = "INVENTORY", Amount = inventory, DrCr = reverse ? "cr" : "dr" });
+        if (direct > 0)
+            purLegs.Add(new() { LegKey = "INVENTORY", Amount = direct, DrCr = reverse ? "cr" : "dr" });
+
+        if (grnBacked > 0)
+            purLegs.Add(new() { LegKey = "GRN_CLEARING", Amount = grnBacked, DrCr = reverse ? "cr" : "dr" });
 
         // One VAT_INPUT leg per tax code, with SubKey = tax code string (e.g. VAT-15)
         foreach (var vat in vatByTax)
@@ -559,6 +679,7 @@ public class Pur1102Service : IPur1102Service
         return lines.Select(l => new Pur1102LineDto
         {
             InvoiceDtlNo = l.InvoiceDtlNo,
+            ReceiptDtlNo = l.ReceiptDtlNo,
             LineNo = l.LineNo,
             ProductNo = l.ProductNo,
             UomNo = l.UomNo,

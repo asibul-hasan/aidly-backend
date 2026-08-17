@@ -36,18 +36,24 @@ public class Pur1106Service : IPur1106Service
     private readonly IUnitOfWork<IPurDbContext> _uow;
     private readonly IDocSequenceGenerator _docSeq;
     private readonly IFinCalendar _calendar;
+    private readonly IPurApLedgerService _apLedger;
 
     private const short StDraft = 1, StApplied = 2;
     private const string DocSeqType = "PUR_LC";
 
+    /// <summary>pur_supplier_ledger ref type — matches ApRefInvoice in Pur1102Service.</summary>
+    private const short ApRefInvoice = 2;
+
     public Pur1106Service(IPurDbContext db, ICompanyBranchContext ctx, IUnitOfWork<IPurDbContext> uow,
-                          IDocSequenceGenerator docSeq, IFinCalendar calendar)
+                          IDocSequenceGenerator docSeq, IFinCalendar calendar,
+                          IPurApLedgerService apLedger)
     {
         _db = db;
         _ctx = ctx;
         _uow = uow;
         _docSeq = docSeq;
         _calendar = calendar;
+        _apLedger = apLedger;
     }
 
     // ── reads ──────────────────────────────────────────────────────────────────
@@ -242,6 +248,17 @@ public class Pur1106Service : IPur1106Service
         var inv = await _db.PurInvoices.FirstOrDefaultAsync(i => i.InvoiceNo == cost.InvoiceNo && i.IsDeleted == 0, ct)
             ?? throw new NotFoundException($"Invoice not found: {cost.InvoiceNo}");
 
+        // Period guard. Applying a landed cost moves inventory valuation, raises the invoice due
+        // and credits the payable — every other posting path in PUR refuses to do that into a
+        // closed period, and this one was the exception.
+        var costDay = DateOnly.FromDateTime(cost.CostDate);
+        var finYear = await _calendar.FindYearForDateAsync(cost.CompanyNo, costDay, ct)
+            ?? throw new ValidationException($"No financial year for date {cost.CostDate:yyyy-MM-dd}");
+        var finPeriod = await _calendar.FindPeriodForDateAsync(finYear.FinYearNo, costDay, ct)
+            ?? throw new ValidationException($"No financial period for date {cost.CostDate:yyyy-MM-dd}");
+        if (finPeriod.PeriodStatus != 1)
+            throw new ValidationException($"Cannot apply: period '{finPeriod.FinPeriodName}' is not Open");
+
         var rows = Allocate(inv.InvoiceNo, cost.Amount, 1);
         if (rows.Count == 0) throw new ValidationException("Invoice has no allocatable lines");
 
@@ -272,6 +289,14 @@ public class Pur1106Service : IPur1106Service
         inv.LandedCostTotal += cost.Amount;
         inv.GrandTotal += cost.Amount;
         inv.DueAmount += cost.Amount;
+
+        // The AP SUB-LEDGER must move with the invoice. The GL leg below credits Payable, and the
+        // invoice's due went up, but pur_supplier_ledger was never touched — so the sub-ledger and
+        // the control account drifted apart by every landed cost ever applied, and the supplier's
+        // statement never showed the freight it is being billed for.
+        await _apLedger.CreditAsync(inv.SupplierNo, cost.Amount, ApRefInvoice, cost.LandedCostId, cost.LandedCostNo,
+            $"Landed cost {cost.LandedCostId} on {inv.InvoiceId}", finYear.FinYearNo, finPeriod.FinPeriodNo,
+            cost.CostDate, ct);
 
         // GL emit
         await EmitGlAsync(cost, inv, ct);

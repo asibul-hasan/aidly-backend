@@ -43,6 +43,9 @@ public class Pur1103Service : IPur1103Service
     private readonly IInvCatalog _catalog;
 
     private const short StPosted = 2, StCancelled = 3;
+
+    /// <summary>pur_return.settlement_mode — must match purConstants.settlementModes in the UI.</summary>
+    private const short SettleAdjustPayable = 1, SettleCashRefund = 2, SettleReplacement = 3;
     private const short MvPurReturn = 3;
     private const short RefPurRet = 3;
     private const short ApRefReturn = 4, ApRefAdj = 5;
@@ -189,7 +192,13 @@ public class Pur1103Service : IPur1103Service
             WarehouseNo = dto.WarehouseNo,
             OriginalInvoiceNo = dto.InvoiceNo,
             ReturnReason = dto.Reason != null && short.TryParse(dto.Reason, out var rr) ? rr : null,
-            SettlementMode = 1,
+            // Honour what the operator picked. This used to be hard-coded to 1, so a Cash Refund
+            // was silently recorded as a payable adjustment: the supplier's balance went down as
+            // if the debt had been netted off, while the cash they actually handed back was never
+            // recorded anywhere.
+            SettlementMode = dto.SettlementMode is >= SettleAdjustPayable and <= SettleReplacement
+                ? dto.SettlementMode
+                : SettleAdjustPayable,
             Status = StPosted,
             Remarks = dto.Remarks,
             FinYearNo = finYear.FinYearNo,
@@ -348,10 +357,21 @@ public class Pur1103Service : IPur1103Service
         decimal sub = ret.SubTotal, tax = ret.TaxAmount, grand = ret.GrandTotal;
         if (grand <= 0) return;
 
-        var legs = new List<GlPostingPayload.Leg>
+        // How the supplier settles decides which account takes the debit.
+        //   Cash Refund  -> money came back, so debit cash.
+        //   Adjust Payable / Replacement -> the debt (or the claim pending replacement) is netted
+        //     against the supplier's payable, which is the conventional debit-note treatment.
+        var legs = new List<GlPostingPayload.Leg>();
+
+        if (ret.SettlementMode == SettleCashRefund)
         {
-            new() { LegKey = "PAYABLE", Amount = grand, DrCr = reverse ? "cr" : "dr", PartyType = 2, PartyNo = supplier.SupplierNo }
-        };
+            legs.Add(new() { LegKey = "CASH", Amount = grand, DrCr = reverse ? "cr" : "dr" });
+        }
+        else
+        {
+            legs.Add(new() { LegKey = "PAYABLE", Amount = grand, DrCr = reverse ? "cr" : "dr",
+                             PartyType = 2, PartyNo = supplier.SupplierNo });
+        }
         if (sub > 0)
             legs.Add(new() { LegKey = "INVENTORY", Amount = sub, DrCr = reverse ? "dr" : "cr" });
         if (tax > 0)

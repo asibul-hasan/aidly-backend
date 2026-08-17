@@ -21,6 +21,11 @@ public class Pur1102Controller : ApiControllerBase
     [HttpGet("lookups")]
     public async Task<IActionResult> GetLookups() => OkResponse(await _lookups.GetLookupsAsync());
 
+    /// <summary>Posted GRN lines for a supplier that no live invoice has billed yet.</summary>
+    [HttpGet("uninvoiced-receipt-lines")]
+    public async Task<IActionResult> GetUninvoicedReceiptLines([FromQuery] long supplierNo)
+        => OkResponse(await _service.GetUninvoicedReceiptLinesAsync(supplierNo));
+
     [HttpGet("invoices")]
     public async Task<IActionResult> GetList() => OkResponse(await _service.GetListAsync());
 
