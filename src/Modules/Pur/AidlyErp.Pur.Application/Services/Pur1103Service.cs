@@ -276,9 +276,17 @@ public class Pur1103Service : IPur1103Service
         ret.TaxAmount = tax;
         ret.GrandTotal = grand;
 
-        // AP debit
-        await _apLedger.DebitAsync(supplier.SupplierNo, grand, ApRefReturn, ret.ReturnId, ret.ReturnNo,
-            $"Purchase return {ret.ReturnId}", finYear.FinYearNo, finPeriod.FinPeriodNo, retDate, ct);
+        // AP debit — ONLY when the settlement actually reduces what we owe.
+        //
+        // A cash refund takes money back instead of netting the debt, so the GL debits Cash and
+        // the payable is untouched. Debiting the sub-ledger anyway drove it away from the control
+        // account by the refund amount on every cash return: measured 24,149.66 sub-ledger against
+        // 26,500.00 in 2101, a gap of exactly two refunds.
+        if (ret.SettlementMode != SettleCashRefund)
+        {
+            await _apLedger.DebitAsync(supplier.SupplierNo, grand, ApRefReturn, ret.ReturnId, ret.ReturnNo,
+                $"Purchase return {ret.ReturnId}", finYear.FinYearNo, finPeriod.FinPeriodNo, retDate, ct);
+        }
 
         // GL emit
         await EmitGlAsync(ret, supplier, "PurchaseReturnPosted", false, ct);
@@ -312,9 +320,13 @@ public class Pur1103Service : IPur1103Service
         if (finPeriod.PeriodStatus != 1)
             throw new ValidationException($"Cannot cancel: period '{finPeriod.FinPeriodName}' is not Open");
 
-        // AP credit (reverse the debit)
-        await _apLedger.CreditAsync(ret.SupplierNo, ret.GrandTotal, ApRefAdj, ret.ReturnId, ret.ReturnNo,
-            $"Return cancelled {ret.ReturnId}", finYear.FinYearNo, finPeriod.FinPeriodNo, ret.ReturnDate, ct);
+        // AP credit — mirror of the post. A cash-refund return never debited the sub-ledger, so
+        // crediting it back here would invent a payable that was never reduced.
+        if (ret.SettlementMode != SettleCashRefund)
+        {
+            await _apLedger.CreditAsync(ret.SupplierNo, ret.GrandTotal, ApRefAdj, ret.ReturnId, ret.ReturnNo,
+                $"Return cancelled {ret.ReturnId}", finYear.FinYearNo, finPeriod.FinPeriodNo, ret.ReturnDate, ct);
+        }
 
         // GL emit (reversing)
         await EmitGlAsync(ret, supplier, "PurchaseReturnReversed", true, ct);

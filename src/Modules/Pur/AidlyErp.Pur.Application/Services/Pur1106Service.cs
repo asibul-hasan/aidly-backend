@@ -211,10 +211,15 @@ public class Pur1106Service : IPur1106Service
         }
         else
         {
+            // The document id comes from the ID generator (SYS_1301), like every other PUR
+            // document. _docSeq and DocSeqType were injected and declared here but never called,
+            // so landed_cost_id arrived null and the save was rejected as "id is required" — the
+            // form has no field for it, so it could never be created at all.
             cost = new PurLandedCost
             {
                 CompanyNo = companyNo,
                 BranchNo = branchNo,
+                LandedCostId = await _docSeq.NextAsync(companyNo, branchNo, DocSeqType, "LC", 6, ct),
                 Status = StDraft,
                 IsActive = 1, IsDeleted = 0,
                 CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow
@@ -224,7 +229,7 @@ public class Pur1106Service : IPur1106Service
 
         cost.CostDate = costDate;
         cost.InvoiceNo = inv.InvoiceNo;
-        cost.CostType = dto.CostType ?? "FREIGHT";
+        cost.CostType = dto.CostType is >= 1 and <= 5 ? dto.CostType.Value : (short)1;
         cost.Amount = dto.Amount;
         cost.Remarks = dto.Remarks;
         cost.UpdatedBy = _ctx.CurrentUserNo(); cost.UpdatedAt = DateTime.UtcNow;

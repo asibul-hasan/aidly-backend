@@ -928,8 +928,9 @@ public class Pur1106LandedCostDto
     [JsonPropertyName("receipt_no")]
     public long? ReceiptNo { get; set; }
 
+    /// <summary>1 Freight · 2 Duty · 3 Clearing · 4 Insurance · 5 Handling (purConstants.landedCostTypes).</summary>
     [JsonPropertyName("cost_type")]
-    public string? CostType { get; set; } = "FREIGHT";
+    public short? CostType { get; set; } = 1;
 
     [JsonPropertyName("vendor_no")]
     public long? VendorNo { get; set; }

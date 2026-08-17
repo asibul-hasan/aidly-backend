@@ -613,9 +613,16 @@ public class PurLandedCost : AuditEntity
     [Column("receipt_no")]
     public long? ReceiptNo { get; set; }
 
+    /// <summary>
+    /// 1 Freight · 2 Duty · 3 Clearing · 4 Insurance · 5 Handling — the codes in
+    /// purConstants.landedCostTypes.
+    ///
+    /// This was mapped as a string defaulting to "FREIGHT" against a SMALLINT column, while the
+    /// form posts the numeric code. Every save from the UI failed deserialization before it ever
+    /// reached the database, which is why the table has never held a row.
+    /// </summary>
     [Column("cost_type")]
-    [StringLength(50)]
-    public string? CostType { get; set; } = "FREIGHT";
+    public short CostType { get; set; } = 1;
 
     [Column("vendor_no")]
     public long? VendorNo { get; set; }
