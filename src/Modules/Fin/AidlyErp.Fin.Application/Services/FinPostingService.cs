@@ -53,11 +53,39 @@ public class FinPostingService : IFinPostingService
 
     public async Task<int> DrainOnceAsync(CancellationToken ct = default)
     {
-        var dueEvents = await _db.EventOutboxes
-            .Where(e => e.Status == StatusPending && e.AvailableAt <= DateTime.UtcNow)
-            .OrderBy(e => e.EventNo)
-            .Take(BatchSize)
-            .ToListAsync(ct);
+        // Claim the batch with FOR UPDATE SKIP LOCKED.
+        //
+        // The plain query let EVERY drainer pointed at this database read the same pending rows.
+        // With a second instance running against the same Aiven database, both picked up the same
+        // event: one won, the other failed and burned a retry, so events landed in Failed with no
+        // trace in this process's log and vouchers had to be re-driven by hand. SKIP LOCKED makes
+        // each drainer take a disjoint set — the loser simply moves on to the next row instead of
+        // fighting over one, so correctness no longer depends on only one instance being deployed.
+        //
+        // Non-relational providers (the in-memory test context) cannot take row locks; there is no
+        // concurrency there either, so the plain query is correct for them.
+        List<EventOutbox> dueEvents;
+        if (_db.Database.IsRelational())
+        {
+            dueEvents = await _db.EventOutboxes
+                .FromSqlRaw(
+                    """
+                    SELECT * FROM sys_event_outbox
+                    WHERE status = {0} AND available_at <= now()
+                    ORDER BY event_no
+                    LIMIT {1}
+                    FOR UPDATE SKIP LOCKED
+                    """, StatusPending, BatchSize)
+                .ToListAsync(ct);
+        }
+        else
+        {
+            dueEvents = await _db.EventOutboxes
+                .Where(e => e.Status == StatusPending && e.AvailableAt <= DateTime.UtcNow)
+                .OrderBy(e => e.EventNo)
+                .Take(BatchSize)
+                .ToListAsync(ct);
+        }
 
 
         int handled = 0;

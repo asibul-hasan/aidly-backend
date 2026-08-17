@@ -108,6 +108,17 @@ public class InvStockPostingService : IInvStockPostingService
                 }
             }
 
+            // Keep the DERIVED columns in step with the movement just applied.
+            //
+            // Only QtyOnHand and AvgCost were maintained here. QtyAvailable and StockValue were
+            // written when the row was first created and never again, so they fossilised: one
+            // live row ended up showing 48 available against 47 on hand — a figure that lets the
+            // app sell stock it does not have — and stock_value drifted to 80,000 against a real
+            // 168,050. Both are pure functions of the values above, so they are recomputed rather
+            // than incremented; an increment would inherit whatever the stale value already was.
+            stock.QtyAvailable = stock.QtyOnHand - stock.QtyReserved;
+            stock.StockValue = stock.QtyOnHand * stock.AvgCost;
+
             // Record Stock Ledger Movement Entry
             var ledger = new InvStockLedger
             {

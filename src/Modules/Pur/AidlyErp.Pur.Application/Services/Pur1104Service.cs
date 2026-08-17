@@ -286,14 +286,24 @@ public class Pur1104Service : IPur1104Service
 
         foreach (var a in allocs)
         {
-            if (!a.InvoiceNo.HasValue) continue;
-            var inv = await _db.PurInvoices.FirstOrDefaultAsync(i => i.InvoiceNo == a.InvoiceNo.Value && i.IsDeleted == 0, ct);
-            if (inv != null)
+            if (a.InvoiceNo.HasValue)
             {
-                inv.PaidAmount -= a.AllocatedAmount;
-                inv.DueAmount += a.AllocatedAmount;
-                inv.PaymentStatus = InvoicePaymentStatus(inv);
+                var inv = await _db.PurInvoices.FirstOrDefaultAsync(i => i.InvoiceNo == a.InvoiceNo.Value && i.IsDeleted == 0, ct);
+                if (inv != null)
+                {
+                    inv.PaidAmount -= a.AllocatedAmount;
+                    inv.DueAmount += a.AllocatedAmount;
+                    inv.PaymentStatus = InvoicePaymentStatus(inv);
+                }
             }
+
+            // Retire the allocation itself. The invoice amounts were being unwound while the
+            // allocation rows stayed live, so a cancelled payment still appeared to be applied to
+            // its bills — the invoice read as unpaid, yet the allocation claimed otherwise, and
+            // anything joining pur_payment_alloc counted money that had been given back.
+            a.IsDeleted = 1;
+            a.DeletedBy = _ctx.CurrentUserNo();
+            a.DeletedAt = DateTime.UtcNow;
         }
 
         // ── reverse AP ──
@@ -383,7 +393,13 @@ public class Pur1104Service : IPur1104Service
     private async Task<PurPayment> RequireAsync(long paymentNo, CancellationToken ct)
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context required");
-        var p = await _db.PurPayments.AsNoTracking()
+
+        // TRACKED. CancelInternalAsync mutates what this returns — it sets Status = Cancelled and
+        // appends the reason — and with AsNoTracking() those writes went to a detached copy that
+        // SaveChanges ignored. The cancel therefore reversed the allocations, the AP ledger and the
+        // GL, replied "Payment cancelled", and left the payment sitting at Posted: it could be
+        // cancelled again and again, reversing the payable every time.
+        var p = await _db.PurPayments
             .FirstOrDefaultAsync(x => x.PaymentNo == paymentNo && x.IsDeleted == 0, ct)
             ?? throw new NotFoundException($"Payment not found: {paymentNo}");
         if (p.CompanyNo != companyNo) throw new ValidationException("Payment belongs to another company");
