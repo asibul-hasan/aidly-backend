@@ -40,6 +40,9 @@ public class Pur1105Service : IPur1105Service
     private readonly IInvCatalog _catalog;
 
     private const short StDraft = 1, StPosted = 2, StCancelled = 3;
+
+    /// <summary>pur_invoice.status for a cancelled invoice — such a bill releases its receipt lines.</summary>
+    private const short InvCancelled = 5;
     private const short MvPurchase = 2;
     private const short RefPurGrn = 6;
     private const string DocSeqType = "PUR_GRN";
@@ -348,6 +351,25 @@ public class Pur1105Service : IPur1105Service
             ?? throw new NotFoundException($"Receipt not found: {receiptNo}");
         if (receipt.CompanyNo != _ctx.CurrentCompanyNo()) throw new ValidationException("GRN belongs to another company");
         if (receipt.Status != StPosted) throw new ValidationException("Only a Posted GRN can be cancelled");
+
+        // A GRN whose lines have been billed cannot be unwound on its own.
+        //
+        // Posting the receipt credits GRN clearing; invoicing that line debits it back. Cancelling
+        // the receipt afterwards debits GRN clearing a SECOND time, so one delivery clears the
+        // accrual twice and the account goes into a debit balance it can never work off — observed
+        // at -1,000 after cancelling a GRN that PINV000012 had already billed. The invoice has to
+        // be cancelled first, which returns the accrual, and then the receipt can be reversed.
+        var billedBy = await (
+            from d in _db.PurReceiptDtls.AsNoTracking()
+            join il in _db.PurInvoiceDtls.AsNoTracking() on d.ReceiptDtlNo equals il.ReceiptDtlNo
+            join i in _db.PurInvoices.AsNoTracking() on il.InvoiceNo equals i.InvoiceNo
+            where d.ReceiptNo == receiptNo && d.IsDeleted == 0
+                  && il.IsDeleted == 0 && i.IsDeleted == 0 && i.Status != InvCancelled
+            select i.InvoiceId).FirstOrDefaultAsync(ct);
+
+        if (billedBy != null)
+            throw new ValidationException(
+                $"These goods are billed on invoice {billedBy} — cancel that invoice before cancelling this GRN");
 
         // Period guard
         var rcptDay = DateOnly.FromDateTime(receipt.ReceiptDate);

@@ -514,8 +514,13 @@ public class Pur1102Service : IPur1102Service
             await _stockPostingService.PostAsync(cmd, ct);
         }
 
-        // (2) Reverse AP
-        await _apLedger.DebitAsync(inv.SupplierNo, inv.GrandTotal, ApRefAdj, inv.InvoiceId, inv.InvoiceNo,
+        // (2) Reverse AP — only what THIS invoice credited.
+        //
+        // Applying a landed cost adds its amount to GrandTotal and credits the payable under its
+        // own document. Debiting GrandTotal here would claw back that freight too, leaving the
+        // sub-ledger short by the landed cost with nothing to explain it.
+        decimal invoicedPayable = inv.GrandTotal - inv.LandedCostTotal;
+        await _apLedger.DebitAsync(inv.SupplierNo, invoicedPayable, ApRefAdj, inv.InvoiceId, inv.InvoiceNo,
             $"Invoice cancelled {inv.InvoiceId}", finYear.FinYearNo, finPeriod.FinPeriodNo, inv.InvoiceDate, ct);
 
         // (3) Reversing GL
@@ -609,7 +614,16 @@ public class Pur1102Service : IPur1102Service
         if (vatByTax.Count == 0 && taxTotal > 0)
             purLegs.Add(new() { LegKey = "VAT_INPUT", Amount = taxTotal, DrCr = reverse ? "cr" : "dr" });
 
-        purLegs.Add(new() { LegKey = "PAYABLE", Amount = grand, DrCr = reverse ? "dr" : "cr", PartyType = 2, PartyNo = inv.SupplierNo });
+        // The payable this invoice created is its OWN goods value plus its own tax — NOT GrandTotal.
+        //
+        // Applying a landed cost adds its amount to inv.GrandTotal and posts its own voucher
+        // (Dr Inventory / Cr Payable) for it. Billing GrandTotal here would credit the payable a
+        // second time for the freight, and on reversal debit 500 more than the invoice's own legs
+        // credit: "Out of balance: debit 10,500.00 != credit 10,000.00", which parked the reversing
+        // voucher as Failed and left the AP sub-ledger disagreeing with the control account.
+        decimal payable = direct + grnBacked + taxTotal;
+
+        purLegs.Add(new() { LegKey = "PAYABLE", Amount = payable, DrCr = reverse ? "dr" : "cr", PartyType = 2, PartyNo = inv.SupplierNo });
 
         var payload = new GlPostingPayload
         {
