@@ -181,6 +181,7 @@ builder.Services.AddScoped<AidlyErp.Hrm.Application.Services.IHrm1205Service, Ai
 builder.Services.AddScoped<AidlyErp.Hrm.Application.Services.IHrm1207Service, AidlyErp.Hrm.Application.Services.Hrm1207Service>();
 builder.Services.AddScoped<AidlyErp.Hrm.Application.Services.IHrmLeavePolicyService, AidlyErp.Hrm.Application.Services.HrmLeavePolicyService>();
 builder.Services.AddScoped<AidlyErp.Sys.Contracts.IApprovalCompletedListener, AidlyErp.Hrm.Application.Services.HrmApprovalListener>();
+builder.Services.AddScoped<AidlyErp.Sys.Contracts.IApprovalCompletedListener, AidlyErp.Pur.Application.Services.PurApprovalListener>();
 
 // GlPosted listeners — stamp gl_voucher_no on source documents after auto-post
 builder.Services.AddScoped<AidlyErp.Sys.Contracts.IGlPostedListener, AidlyErp.Sal.Application.Services.SalGlPostedListener>();

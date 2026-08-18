@@ -114,7 +114,12 @@ public class Pur1102Service : IPur1102Service
     private async Task<Pur1102InvoiceDto> SaveInternalAsync(Pur1102InvoiceDto dto, CancellationToken ct)
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context required");
-        long branchNo = dto.BranchNo ?? _ctx.CurrentBranchNo() ?? throw new ValidationException("Branch context required");
+        // Branch comes from the AUTH CONTEXT ONLY. This used to read `dto.BranchNo ?? context`, so a
+        // caller could post a branch_no they have no access to and create the record there —
+        // company isolation held, but branch isolation did not, and the data_scope feature
+        // (which defaults to BRANCH) trusts this column. No form sends the field; the override
+        // was reachable only by hand-crafting a request.
+        long branchNo = _ctx.CurrentBranchNo() ?? throw new ValidationException("Branch context required");
 
         if (dto.SupplierNo <= 0) throw new ValidationException("Supplier is required");
         if (dto.WarehouseNo <= 0) throw new ValidationException("Warehouse is required");
