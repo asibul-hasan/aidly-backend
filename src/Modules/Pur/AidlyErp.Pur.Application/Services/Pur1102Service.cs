@@ -52,6 +52,9 @@ public class Pur1102Service : IPur1102Service
 
     /// <summary>pur_receipt.status for a posted GRN — only those carry a clearable accrual.</summary>
     private const short RcvPosted = 2;
+
+    /// <summary>pur_landed_cost.status once applied — its value is capitalised and payable raised.</summary>
+    private const short LcApplied = 2;
     private const short MvPurchase = 2;
     private const short RefPurInv = 2;
     private const short ApRefInvoice = 2, ApRefAdj = 5;
@@ -492,6 +495,22 @@ public class Pur1102Service : IPur1102Service
             ?? throw new NotFoundException($"Invoice not found: {invoiceNo}");
         if (inv.Status != StPosted) throw new ValidationException("Only a Posted invoice can be cancelled");
         if (inv.ReturnedAmount > 0) throw new ValidationException("Invoice has returns — reverse those first");
+
+        // An applied landed cost has its own posted voucher (Dr Inventory / Cr Payable) and its own
+        // AP sub-ledger credit, under the landed cost document — not this invoice. Cancelling the
+        // invoice reverses only what the invoice itself created, so that freight would be left
+        // standing against a cancelled bill: measured as a 500.00 payable with no live invoice
+        // behind it, which is exactly the gap between open invoices (16,000) and the AP control
+        // account (16,500). Nothing in PUR_1106 reverses an applied cost, so the only correct
+        // answer today is to refuse the cancellation and say what has to happen first.
+        var appliedCost = await _db.PurLandedCosts.AsNoTracking()
+            .Where(c => c.InvoiceNo == invoiceNo && c.IsDeleted == 0 && c.Status == LcApplied)
+            .Select(c => c.LandedCostId)
+            .FirstOrDefaultAsync(ct);
+
+        if (appliedCost != null)
+            throw new ValidationException(
+                $"Landed cost {appliedCost} is applied to this invoice — reverse it before cancelling");
 
         // Period guard
         var invDay = DateOnly.FromDateTime(inv.InvoiceDate);

@@ -95,10 +95,11 @@ public class FinPostingService : IFinPostingService
             using var scope = _scopeFactory.CreateScope();
             var scopedVoucherService = scope.ServiceProvider.GetRequiredService<IFin1101Service>();
             var scopedCtx = scope.ServiceProvider.GetRequiredService<ICompanyBranchContext>();
+            var scopedUow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<IFinDbContext>>();
 
             try
             {
-                await ProcessAndPublishAsync(ev, scopedVoucherService, scopedCtx, ct);
+                await ProcessAndPublishAsync(ev, scopedVoucherService, scopedCtx, scopedUow, ct);
                 handled++;
             }
             catch (Exception ex)
@@ -120,10 +121,11 @@ public class FinPostingService : IFinPostingService
         using var scope = _scopeFactory.CreateScope();
         var scopedVoucherService = scope.ServiceProvider.GetRequiredService<IFin1101Service>();
         var scopedCtx = scope.ServiceProvider.GetRequiredService<ICompanyBranchContext>();
+        var scopedUow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<IFinDbContext>>();
 
         try
         {
-            await ProcessAndPublishAsync(ev, scopedVoucherService, scopedCtx, ct);
+            await ProcessAndPublishAsync(ev, scopedVoucherService, scopedCtx, scopedUow, ct);
         }
         catch (Exception ex)
         {
@@ -132,7 +134,9 @@ public class FinPostingService : IFinPostingService
         }
     }
 
-    private async Task ProcessAndPublishAsync(EventOutbox ev, IFin1101Service voucherService, ICompanyBranchContext ctx, CancellationToken ct)
+    private async Task ProcessAndPublishAsync(EventOutbox ev, IFin1101Service voucherService,
+                                              ICompanyBranchContext ctx, IUnitOfWork<IFinDbContext> uow,
+                                              CancellationToken ct)
     {
         if (ev.Status == StatusPublished) return;
 
@@ -164,7 +168,24 @@ public class FinPostingService : IFinPostingService
                 long voucherTypeNo = await voucherService.ResolveSystemJournalTypeAsync(companyNo, ct);
                 DateTime date = payload.VoucherDate ?? DateTime.UtcNow;
 
-                long voucherNo = await voucherService.PostSystemVoucherAsync(
+                // ONE transaction for insert + post.
+                //
+                // PostSystemVoucherAsync calls InsertInternalAsync (which commits the Draft header
+                // and lines) and then PostInternalAsync (period re-check, balance re-check,
+                // fin_ledger write) as two separate units. InsertInternalAsync only skips opening
+                // its own transaction when one is already ambient — and this engine, the highest
+                // volume unattended posting path in the system, never opened one. Its comment
+                // claimed "the posting engine opens one"; it did not.
+                //
+                // So anything failing between the two — a period closed by another user a moment
+                // earlier, a process restart, a database blip — left a Draft voucher committed and
+                // unposted while the outbox event went back to Pending. AlreadyPostedAsync only
+                // looks for Status == Posted, so the retry would not see that Draft and would build
+                // a second voucher for the same source document. The unique index on
+                // (company, branch, source_doc_type, source_doc_no) then rejected the retry
+                // outright, so the event could never post at all until someone deleted the orphan
+                // by hand.
+                long voucherNo = await uow.ExecuteAsync(async token => await voucherService.PostSystemVoucherAsync(
                     companyNo,
                     branchNo,
                     voucherTypeNo,
@@ -174,7 +195,7 @@ public class FinPostingService : IFinPostingService
                     ev.EventType,
                     sourceDocNo ?? 0,
                     lines,
-                    ct);
+                    token), ct);
 
                 // Emit GlPosted so the source document can stamp its gl_voucher_no
                 var postedVoucher = await _db.FinVouchers.AsNoTracking()

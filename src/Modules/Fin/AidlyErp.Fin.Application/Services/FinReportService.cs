@@ -459,17 +459,59 @@ public class FinReportService : IFinReportService
         {
             decimal current = 0, days31_60 = 0, days61_90 = 0, daysOver90 = 0;
 
-            foreach (var l in g)
+            // Age the OPEN balance, not each ledger line by its own date.
+            //
+            // Bucketing every line independently put a payment in whichever bucket its own date
+            // fell in, while the invoice it settled stayed in another. A 200-day-old invoice paid
+            // last week reported as 1,000 in "90+ days" and -1,000 in "current": the party owes
+            // nothing, yet the report shows them as materially overdue and a negative current
+            // balance. The total was right; every bucket was wrong — and the buckets are the entire
+            // point of an aging report, since they decide who gets chased.
+            //
+            // Settlements are applied oldest-invoice-first (FIFO), which is how a supplier or
+            // customer statement is read when no explicit allocation is recorded. What remains of
+            // each invoice is then aged by THAT invoice's date.
+            var opens = new List<(DateTime Date, decimal Remaining)>();
+            decimal unapplied = 0m;
+
+            foreach (var l in g.OrderBy(x => x.VoucherDate).ThenBy(x => x.LedgerNo))
             {
                 // AR: debit increases receivable; AP: credit increases payable
                 decimal amount = partyType == 1 ? (l.Debit - l.Credit) : (l.Credit - l.Debit);
-                int days = (asOfDate - l.VoucherDate).Days;
 
-                if (days <= 30) current += amount;
-                else if (days <= 60) days31_60 += amount;
-                else if (days <= 90) days61_90 += amount;
-                else daysOver90 += amount;
+                if (amount > 0)
+                {
+                    opens.Add((l.VoucherDate, amount));
+                }
+                else if (amount < 0)
+                {
+                    decimal settle = -amount;
+                    for (int i = 0; i < opens.Count && settle > 0; i++)
+                    {
+                        if (opens[i].Remaining <= 0) continue;
+                        decimal take = Math.Min(settle, opens[i].Remaining);
+                        opens[i] = (opens[i].Date, opens[i].Remaining - take);
+                        settle -= take;
+                    }
+                    // An overpayment or a credit note with nothing left to settle is still money
+                    // that moved — carry it so the party total stays reconcilable to the ledger.
+                    unapplied -= settle;
+                }
             }
+
+            foreach (var o in opens)
+            {
+                if (o.Remaining <= 0) continue;
+                int days = (asOfDate - o.Date).Days;
+
+                if (days <= 30) current += o.Remaining;
+                else if (days <= 60) days31_60 += o.Remaining;
+                else if (days <= 90) days61_90 += o.Remaining;
+                else daysOver90 += o.Remaining;
+            }
+
+            // Credit sitting on the account belongs in the newest bucket — it is not overdue.
+            current += unapplied;
 
             rows.Add(new Fin1307AgingRowDto
             {
