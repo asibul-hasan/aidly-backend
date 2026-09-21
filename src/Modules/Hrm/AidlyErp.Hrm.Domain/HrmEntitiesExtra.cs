@@ -205,10 +205,10 @@ public class HrmGrade : AuditEntity, IBranchScopedEntity
     [Column("rank_order")]
     public int? RankOrder { get; set; }
 
-    [Column("min_salary", TypeName = "numeric(20,4)")]
+    [Column("min_salary")]
     public decimal? MinSalary { get; set; }
 
-    [Column("max_salary", TypeName = "numeric(20,4)")]
+    [Column("max_salary")]
     public decimal? MaxSalary { get; set; }
 
     [Column("is_overtime_eligible")]

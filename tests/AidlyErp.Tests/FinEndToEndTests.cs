@@ -7,6 +7,8 @@ using AidlyErp.Shared.Core.Security;
 using AidlyErp.Shared.Core.Abstractions;
 using AidlyErp.Shared.Core;
 using AidlyErp.Sys.Contracts;
+using AidlyErp.Pur.Contracts;
+using AidlyErp.Sal.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 
@@ -95,10 +97,7 @@ public class FinEndToEndTests
             new FinAccount { AccountNo = 1, CompanyNo = 1, AccountCode = "1010", AccountName = "Cash", AccountGroupNo = 1, RootType = 1, NormalBalance = "dr", IsPostable = 1, IsActive = 1, IsDeleted = 0, OpeningBalance = 0, OpeningDrCr = "dr" },
             new FinAccount { AccountNo = 2, CompanyNo = 1, AccountCode = "3010", AccountName = "Equity", AccountGroupNo = 2, RootType = 3, NormalBalance = "cr", IsPostable = 1, IsActive = 1, IsDeleted = 0, OpeningBalance = 0, OpeningDrCr = "cr" }
         );
-        db.FinAccountGroups.AddRange(
-            new FinAccountGroup { AccountGroupNo = 1, CompanyNo = 1, GroupCode = "ASSETS", GroupName = "Assets", RootType = 1, NormalBalance = "dr", IsDeleted = 0 },
-            new FinAccountGroup { AccountGroupNo = 2, CompanyNo = 1, GroupCode = "EQUITY", GroupName = "Equity", RootType = 3, NormalBalance = "cr", IsDeleted = 0 }
-        );
+
         db.FinVoucherTypes.Add(new FinVoucherType { VoucherTypeNo = 1, CompanyNo = 1, VoucherTypeCode = "OPN", VoucherTypeName = "Opening", BaseKind = 7, Prefix = "OPN", IsActive = 1, IsDeleted = 0 });
         await db.SaveChangesAsync(CancellationToken.None);
 
@@ -227,13 +226,303 @@ public class FinEndToEndTests
         Assert.True(Math.Abs(totalDebit - totalCredit) < 0.01m, $"Day book not balanced: Dr={totalDebit} Cr={totalCredit}");
     }
 
+    /// <summary>
+    /// Multi-currency dual stamping test:
+    /// Section 5.3 of acc-business-doc.md:
+    /// FC is converted by FxRate to BC and balances in base currency.
+    /// </summary>
+    [Fact]
+    public async Task MultiCurrency_Voucher_StampsBothFCAndBC_AndBalances()
+    {
+        var db = CreateDb();
+        var ctx = CreateContext();
+        var calendar = CreateCalendar();
+        var docSeq = CreateDocSeq();
+        var currencyLookup = CreateCurrencyLookup();
+        var approvalService = CreateApprovalService();
+        var uow = new Mock<IUnitOfWork<IFinDbContext>>();
+
+        // Seed chart of accounts
+        db.FinAccounts.AddRange(
+            new FinAccount { AccountNo = 1, CompanyNo = 1, AccountCode = "1010", AccountName = "USD Bank", AccountGroupNo = 1, RootType = 1, NormalBalance = "dr", IsPostable = 1, IsActive = 1, IsDeleted = 0 },
+            new FinAccount { AccountNo = 2, CompanyNo = 1, AccountCode = "4010", AccountName = "Export Revenue", AccountGroupNo = 4, RootType = 4, NormalBalance = "cr", IsPostable = 1, IsActive = 1, IsDeleted = 0 }
+        );
+
+        db.FinVoucherTypes.Add(new FinVoucherType { VoucherTypeNo = 1, CompanyNo = 1, VoucherTypeCode = "JV", VoucherTypeName = "Journal", BaseKind = 1, Prefix = "JV", IsActive = 1, IsDeleted = 0 });
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var voucherService = new Fin1101Service(db, ctx, approvalService, calendar, uow.Object, docSeq, currencyLookup);
+        uow.Setup(u => u.ExecuteAsync(It.IsAny<Func<CancellationToken, Task<Fin1101VoucherDto>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<CancellationToken, Task<Fin1101VoucherDto>> fn, CancellationToken ct) => fn(ct));
+
+        // Create voucher in USD (currencyNo = 2, base currency is 1) with fx_rate = 120.00
+        var dto = new Fin1101VoucherDto
+        {
+            VoucherTypeNo = 1,
+            VoucherDate = new DateTime(2026, 1, 15),
+            Narration = "Export receipt USD 100 @ 120",
+            CurrencyNo = 2,
+            FxRate = 120.00m,
+            Lines = new List<Fin1101VoucherLineDto>
+            {
+                new() { AccountNo = 1, LineNo = 1, DebitFc = 100.00m, DrCr = "dr" },
+                new() { AccountNo = 2, LineNo = 2, CreditFc = 100.00m, DrCr = "cr" }
+            }
+        };
+
+        var saved = await voucherService.SaveAsync(dto);
+
+        // Assert header conversion & balance
+        Assert.NotNull(saved.VoucherNo);
+        Assert.Equal(12000.00m, saved.TotalDebit);
+        Assert.Equal(12000.00m, saved.TotalCredit);
+        Assert.Equal(120.00m, saved.FxRate);
+        Assert.Equal(2, saved.CurrencyNo);
+
+        // Assert detail lines have both FC and BC
+        Assert.Equal(2, saved.Lines.Count);
+        var drLine = saved.Lines.First(l => l.DrCr == "dr");
+        Assert.Equal(100.00m, drLine.DebitFc);
+        Assert.Equal(12000.00m, drLine.Debit);
+
+        var crLine = saved.Lines.First(l => l.DrCr == "cr");
+        Assert.Equal(100.00m, crLine.CreditFc);
+        Assert.Equal(12000.00m, crLine.Credit);
+
+        // Submit voucher to post to ledger
+        var submitted = await voucherService.SubmitAsync(saved.VoucherNo.Value);
+        Assert.Equal((short)2, submitted.Status); // 2 = Posted
+
+        // Verify ledger entries
+        var ledgerRows = await db.FinLedgers.Where(l => l.VoucherNo == saved.VoucherNo.Value).ToListAsync();
+        Assert.Equal(2, ledgerRows.Count);
+        Assert.Equal(12000.00m, ledgerRows.Sum(l => l.Debit));
+        Assert.Equal(12000.00m, ledgerRows.Sum(l => l.Credit));
+    }
+
+    /// <summary>
+    /// Section 5.1 of acc-business-doc.md:
+    /// Zero Imbalance Constraint: Sum(Debits) - Sum(Credits) = 0.0000.
+    /// A voucher with non-zero difference must throw ValidationException.
+    /// </summary>
+    [Fact]
+    public async Task Voucher_ZeroImbalance_ThrowsValidationException()
+    {
+        var db = CreateDb();
+        var ctx = CreateContext();
+        var calendar = CreateCalendar();
+        var docSeq = CreateDocSeq();
+        var currencyLookup = CreateCurrencyLookup();
+        var approvalService = CreateApprovalService();
+        var uow = new Mock<IUnitOfWork<IFinDbContext>>();
+
+        db.FinAccounts.AddRange(
+            new FinAccount { AccountNo = 1, CompanyNo = 1, AccountCode = "1010", AccountName = "Cash", AccountGroupNo = 1, RootType = 1, NormalBalance = "dr", IsPostable = 1, IsActive = 1, IsDeleted = 0 },
+            new FinAccount { AccountNo = 2, CompanyNo = 1, AccountCode = "4010", AccountName = "Revenue", AccountGroupNo = 4, RootType = 4, NormalBalance = "cr", IsPostable = 1, IsActive = 1, IsDeleted = 0 }
+        );
+        db.FinVoucherTypes.Add(new FinVoucherType { VoucherTypeNo = 1, CompanyNo = 1, VoucherTypeCode = "JV", VoucherTypeName = "Journal", BaseKind = 1, Prefix = "JV", IsActive = 1, IsDeleted = 0 });
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var voucherService = new Fin1101Service(db, ctx, approvalService, calendar, uow.Object, docSeq, currencyLookup);
+        uow.Setup(u => u.ExecuteAsync(It.IsAny<Func<CancellationToken, Task<Fin1101VoucherDto>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<CancellationToken, Task<Fin1101VoucherDto>> fn, CancellationToken ct) => fn(ct));
+
+        // Unbalanced voucher: Dr 100 vs Cr 90
+        var unbalancedDto = new Fin1101VoucherDto
+        {
+            VoucherTypeNo = 1,
+            VoucherDate = new DateTime(2026, 1, 15),
+            Narration = "Unbalanced voucher",
+            Lines = new List<Fin1101VoucherLineDto>
+            {
+                new() { AccountNo = 1, LineNo = 1, Debit = 100.00m, Credit = 0m },
+                new() { AccountNo = 2, LineNo = 2, Debit = 0m, Credit = 90.00m }
+            }
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(() => voucherService.SaveAsync(unbalancedDto));
+    }
+
+    /// <summary>
+    /// Section 5.2 of acc-business-doc.md:
+    /// Leaf Node Enforcement: direct GL entries are strictly blocked against parent/group accounts.
+    /// Attempting to post to an account with IsPostable = 0 must throw ValidationException.
+    /// </summary>
+    [Fact]
+    public async Task Voucher_NonPostableHeaderAccount_ThrowsValidationException()
+    {
+        var db = CreateDb();
+        var ctx = CreateContext();
+        var calendar = CreateCalendar();
+        var docSeq = CreateDocSeq();
+        var currencyLookup = CreateCurrencyLookup();
+        var approvalService = CreateApprovalService();
+        var uow = new Mock<IUnitOfWork<IFinDbContext>>();
+
+        db.FinAccounts.AddRange(
+            new FinAccount { AccountNo = 1, CompanyNo = 1, AccountCode = "1000", AccountName = "Current Assets (Header)", AccountGroupNo = 1, RootType = 1, NormalBalance = "dr", IsPostable = 0, IsActive = 1, IsDeleted = 0 },
+            new FinAccount { AccountNo = 2, CompanyNo = 1, AccountCode = "4010", AccountName = "Revenue", AccountGroupNo = 4, RootType = 4, NormalBalance = "cr", IsPostable = 1, IsActive = 1, IsDeleted = 0 }
+        );
+        db.FinVoucherTypes.Add(new FinVoucherType { VoucherTypeNo = 1, CompanyNo = 1, VoucherTypeCode = "JV", VoucherTypeName = "Journal", BaseKind = 1, Prefix = "JV", IsActive = 1, IsDeleted = 0 });
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var voucherService = new Fin1101Service(db, ctx, approvalService, calendar, uow.Object, docSeq, currencyLookup);
+        uow.Setup(u => u.ExecuteAsync(It.IsAny<Func<CancellationToken, Task<Fin1101VoucherDto>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<CancellationToken, Task<Fin1101VoucherDto>> fn, CancellationToken ct) => fn(ct));
+
+        var dto = new Fin1101VoucherDto
+        {
+            VoucherTypeNo = 1,
+            VoucherDate = new DateTime(2026, 1, 15),
+            Narration = "Posting to header account",
+            Lines = new List<Fin1101VoucherLineDto>
+            {
+                new() { AccountNo = 1, LineNo = 1, Debit = 100.00m, Credit = 0m },
+                new() { AccountNo = 2, LineNo = 2, Debit = 0m, Credit = 100.00m }
+            }
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => voucherService.SaveAsync(dto));
+        Assert.Contains("not postable", ex.Message);
+    }
+
+    /// <summary>
+    /// Section 5.4 of acc-business-doc.md:
+    /// Period Locking Rule: Posting to a closed period must throw ValidationException.
+    /// </summary>
+    [Fact]
+    public async Task Voucher_ClosedPeriod_ThrowsValidationException()
+    {
+        var db = CreateDb();
+        var ctx = CreateContext();
+        var calendar = new Mock<IFinCalendar>();
+        var docSeq = CreateDocSeq();
+        var currencyLookup = CreateCurrencyLookup();
+        var approvalService = CreateApprovalService();
+        var uow = new Mock<IUnitOfWork<IFinDbContext>>();
+
+        calendar.Setup(c => c.FindYearForDateAsync(It.IsAny<long>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FinYearInfo(1, 1, "FY2026", "FY2026", "FY2026", new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), 1, 0, null));
+        // Period status 2 = Closed
+        calendar.Setup(c => c.FindPeriodForDateAsync(It.IsAny<long>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FinPeriodInfo(1, 1, "P01", "January", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), 2, 0, 0));
+        calendar.Setup(c => c.FindPeriodAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FinPeriodInfo(1, 1, "P01", "January", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), 2, 0, 0));
+
+        db.FinAccounts.AddRange(
+            new FinAccount { AccountNo = 1, CompanyNo = 1, AccountCode = "1010", AccountName = "Cash", AccountGroupNo = 1, RootType = 1, NormalBalance = "dr", IsPostable = 1, IsActive = 1, IsDeleted = 0 },
+            new FinAccount { AccountNo = 2, CompanyNo = 1, AccountCode = "4010", AccountName = "Revenue", AccountGroupNo = 4, RootType = 4, NormalBalance = "cr", IsPostable = 1, IsActive = 1, IsDeleted = 0 }
+        );
+        db.FinVoucherTypes.Add(new FinVoucherType { VoucherTypeNo = 1, CompanyNo = 1, VoucherTypeCode = "JV", VoucherTypeName = "Journal", BaseKind = 1, Prefix = "JV", IsActive = 1, IsDeleted = 0 });
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var voucherService = new Fin1101Service(db, ctx, approvalService, calendar.Object, uow.Object, docSeq, currencyLookup);
+        uow.Setup(u => u.ExecuteAsync(It.IsAny<Func<CancellationToken, Task<Fin1101VoucherDto>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<CancellationToken, Task<Fin1101VoucherDto>> fn, CancellationToken ct) => fn(ct));
+
+        var dto = new Fin1101VoucherDto
+        {
+            VoucherTypeNo = 1,
+            VoucherDate = new DateTime(2026, 1, 15),
+            Narration = "Posting to closed period",
+            Lines = new List<Fin1101VoucherLineDto>
+            {
+                new() { AccountNo = 1, LineNo = 1, Debit = 100.00m, Credit = 0m },
+                new() { AccountNo = 2, LineNo = 2, Debit = 0m, Credit = 100.00m }
+            }
+        };
+
+        var saved = await voucherService.SaveAsync(dto);
+        Assert.NotNull(saved.VoucherNo);
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => voucherService.SubmitAsync(saved.VoucherNo.Value));
+        Assert.Contains("not Open", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Section 4.3 & FIN_1102:
+    /// Bank Reconciliation Worksheet: calculates book balance, cleared lines, and uncleared difference.
+    /// </summary>
+    [Fact]
+    public async Task BankRecon_Worksheet_CalculatesBookBalanceAndClearedItems()
+    {
+        var db = CreateDb();
+        var ctx = CreateContext();
+        var uow = new Mock<IUnitOfWork<IFinDbContext>>();
+
+        // Bank control account (ControlType = 3)
+        db.FinAccounts.Add(new FinAccount
+        {
+            AccountNo = 10, CompanyNo = 1, AccountCode = "1020", AccountName = "Primary Bank",
+            ControlType = 3, RootType = 1, NormalBalance = "dr", IsPostable = 1, IsActive = 1, IsDeleted = 0
+        });
+
+        // Seed 2 ledger rows: Deposit $5,000 and Check $2,000
+        db.FinLedgers.AddRange(
+            new FinLedger { LedgerNo = 1, CompanyNo = 1, BranchNo = 1, AccountNo = 10, VoucherNo = 1, VoucherDtlNo = 1, VoucherDate = new DateTime(2026, 1, 10), Debit = 5000, Credit = 0, IsDeleted = 0 },
+            new FinLedger { LedgerNo = 2, CompanyNo = 1, BranchNo = 1, AccountNo = 10, VoucherNo = 2, VoucherDtlNo = 2, VoucherDate = new DateTime(2026, 1, 20), Debit = 0, Credit = 2000, IsDeleted = 0 }
+        );
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var reconService = new Fin1102Service(db, ctx, uow.Object);
+
+        // Act: request worksheet as of Jan 31, 2026
+        var ws = await reconService.GetWorksheetAsync(10, new DateTime(2026, 1, 31));
+
+        // Assert book balance: 5000 - 2000 = 3000
+        Assert.Equal(3000m, ws.BookBalance);
+        Assert.Equal(2, ws.Lines.Count);
+    }
+
+    /// <summary>
+    /// FIN_1202 / FIN_1203:
+    /// Sub-Ledger Reconciliation: compares operational sub-ledger outstanding against GL control accounts.
+    /// </summary>
+    [Fact]
+    public async Task SubLedger_Reconciliation_CalculatesDiscrepancyBetweenModuleAndGL()
+    {
+        var db = CreateDb();
+        var ctx = CreateContext();
+        var partyLookup = new Mock<IPartyLookup>();
+        var apReader = new Mock<IPurApLedgerReader>();
+        var arReader = new Mock<ISalArLedgerReader>();
+
+        // Customer sub-ledger reports $15,000 outstanding for Customer 101
+        arReader.Setup(r => r.GetOutstandingAsync(1, It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ArPartyBalance> { new(101, 15000m) });
+
+        partyLookup.Setup(p => p.GetPartyNamesAsync(1, It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<long, string> { { 101, "Acme Corp" } });
+
+        // Control account (ControlType = 1: Accounts Receivable)
+        db.FinAccounts.Add(new FinAccount
+        {
+            AccountNo = 20, CompanyNo = 1, AccountCode = "1200", AccountName = "Accounts Receivable",
+            ControlType = 1, RootType = 1, NormalBalance = "dr", IsPostable = 1, IsActive = 1, IsDeleted = 0
+        });
+
+        // GL has posted $15,000 to Customer 101
+        db.FinLedgers.Add(new FinLedger
+        {
+            LedgerNo = 1, CompanyNo = 1, BranchNo = 1, AccountNo = 20, PartyType = 1, PartyNo = 101,
+            VoucherDate = new DateTime(2026, 1, 15), Debit = 15000m, Credit = 0m, IsDeleted = 0
+        });
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var subLedgerService = new FinSubLedgerService(db, ctx, partyLookup.Object, apReader.Object, arReader.Object);
+
+        var recon = await subLedgerService.GetReconciliationAsync(1, new DateTime(2026, 1, 31));
+
+        Assert.Equal(15000m, recon.SubLedgerTotal);
+        Assert.Equal(15000m, recon.GlControlTotal);
+        Assert.Equal(0m, recon.Difference); // Fully reconciled!
+    }
+
     // In-memory DbContext for testing
     private class FinInMemoryDbContext : DbContext, IFinDbContext
     {
         public FinInMemoryDbContext(DbContextOptions<FinInMemoryDbContext> options) : base(options) { }
 
         public DbSet<FinAccount> FinAccounts => Set<FinAccount>();
-        public DbSet<FinAccountGroup> FinAccountGroups => Set<FinAccountGroup>();
         public DbSet<FinAccountBalance> FinAccountBalances => Set<FinAccountBalance>();
         public DbSet<FinGlMap> FinGlMaps => Set<FinGlMap>();
         public DbSet<FinVoucher> FinVouchers => Set<FinVoucher>();

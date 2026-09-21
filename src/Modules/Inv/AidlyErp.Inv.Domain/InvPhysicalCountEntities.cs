@@ -86,10 +86,8 @@ public class InvPhysicalCountDtl
     [Column("counted_qty")]
     public decimal CountedQty { get; set; }
 
-    /// <summary>Database-generated as counted − system; never written by the application.</summary>
     [Column("variance_qty")]
-    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-    public decimal VarianceQty { get; private set; }
+    public decimal VarianceQty { get; set; } = 0m;
 
     [Column("unit_cost")]
     public decimal UnitCost { get; set; }

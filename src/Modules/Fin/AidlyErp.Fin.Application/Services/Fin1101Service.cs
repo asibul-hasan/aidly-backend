@@ -107,6 +107,8 @@ public class Fin1101Service : IFin1101Service
                 VoucherTypeName = t.VoucherTypeName,
                 BaseKind = t.BaseKind,
                 Prefix = t.Prefix,
+                DefaultDrAccountNo = t.DefaultDrAccountNo,
+                DefaultCrAccountNo = t.DefaultCrAccountNo,
                 IsSystem = t.IsSystem
             })
             .ToListAsync(ct);
@@ -155,8 +157,6 @@ public class Fin1101Service : IFin1101Service
 
         if (type.IsActive != 1) throw new ValidationException("Voucher type is inactive");
 
-        await ValidateLinesAsync(dto.Lines, companyNo, ct);
-
         // sys_fin_year(_dtl).start_date/end_date are DATE columns (DateOnly).
         var voucherDay = DateOnly.FromDateTime(dto.VoucherDate);
 
@@ -166,19 +166,49 @@ public class Fin1101Service : IFin1101Service
         var finPeriod = await _calendar.FindPeriodForDateAsync(finYear.FinYearNo, voucherDay, ct)
             ?? throw new ValidationException($"No financial period configured for date {dto.VoucherDate:yyyy-MM-dd}");
 
-        // Currency guard — reject non-base currency until multi-currency is fully supported
+        // Currency resolution & Multi-currency support
         if (dto.CurrencyNo.HasValue)
         {
             long baseCurrencyNo = await _currencyLookup.GetBaseCurrencyNoAsync(companyNo, ct);
-            if (baseCurrencyNo == 0)
-                throw new ValidationException("No base currency configured for this company");
-            if (dto.CurrencyNo.Value != baseCurrencyNo)
-                throw new ValidationException("Multi-currency vouchers not supported yet");
+            if (baseCurrencyNo > 0 && dto.CurrencyNo.Value == baseCurrencyNo)
+            {
+                dto.FxRate = 1.0m;
+            }
+            else if (dto.FxRate <= 0)
+            {
+                dto.FxRate = 1.0m;
+            }
+        }
+        else
+        {
+            dto.FxRate = dto.FxRate > 0 ? dto.FxRate : 1.0m;
         }
 
-        // Currency guard — reject non-unit FX rate
-        if (dto.FxRate > 0 && dto.FxRate != 1m)
-            throw new ValidationException("Multi-currency vouchers not supported yet");
+        // Apply FX conversion on lines if DebitFc / CreditFc supplied and base Debit / Credit is 0
+        if (dto.Lines != null)
+        {
+            foreach (var line in dto.Lines)
+            {
+                if (dto.FxRate > 0 && dto.FxRate != 1.0m)
+                {
+                    if (line.Debit == 0 && line.DebitFc > 0)
+                        line.Debit = line.DebitFc * dto.FxRate;
+                    if (line.Credit == 0 && line.CreditFc > 0)
+                        line.Credit = line.CreditFc * dto.FxRate;
+                    if (line.DebitFc == 0 && line.Debit > 0)
+                        line.DebitFc = line.Debit / dto.FxRate;
+                    if (line.CreditFc == 0 && line.Credit > 0)
+                        line.CreditFc = line.Credit / dto.FxRate;
+                }
+                else
+                {
+                    if (line.DebitFc == 0) line.DebitFc = line.Debit;
+                    if (line.CreditFc == 0) line.CreditFc = line.Credit;
+                }
+            }
+        }
+
+        await ValidateLinesAsync(dto.Lines, companyNo, ct);
 
         decimal totalDebit = dto.Lines.Sum(l => l.Debit);
         decimal totalCredit = dto.Lines.Sum(l => l.Credit);
@@ -277,8 +307,32 @@ public class Fin1101Service : IFin1101Service
             v.VoucherTypeNo = dto.VoucherTypeNo;
         }
 
+        if (dto.CurrencyNo.HasValue) v.CurrencyNo = dto.CurrencyNo;
+        if (dto.FxRate > 0) v.FxRate = dto.FxRate;
+
         if (dto.Lines != null && dto.Lines.Count > 0)
         {
+            decimal fx = v.FxRate > 0 ? v.FxRate : 1.0m;
+            foreach (var line in dto.Lines)
+            {
+                if (fx != 1.0m)
+                {
+                    if (line.Debit == 0 && line.DebitFc > 0)
+                        line.Debit = line.DebitFc * fx;
+                    if (line.Credit == 0 && line.CreditFc > 0)
+                        line.Credit = line.CreditFc * fx;
+                    if (line.DebitFc == 0 && line.Debit > 0)
+                        line.DebitFc = line.Debit / fx;
+                    if (line.CreditFc == 0 && line.Credit > 0)
+                        line.CreditFc = line.Credit / fx;
+                }
+                else
+                {
+                    if (line.DebitFc == 0) line.DebitFc = line.Debit;
+                    if (line.CreditFc == 0) line.CreditFc = line.Credit;
+                }
+            }
+
             await ValidateLinesAsync(dto.Lines, companyNo, ct);
             v.TotalDebit = dto.Lines.Sum(l => l.Debit);
             v.TotalCredit = dto.Lines.Sum(l => l.Credit);
@@ -590,8 +644,8 @@ public class Fin1101Service : IFin1101Service
                 DrCr = drCr,
                 Debit = dtoLine.Debit,
                 Credit = dtoLine.Credit,
-                DebitFc = dtoLine.Debit,
-                CreditFc = dtoLine.Credit,
+                DebitFc = dtoLine.DebitFc != 0 ? dtoLine.DebitFc : dtoLine.Debit,
+                CreditFc = dtoLine.CreditFc != 0 ? dtoLine.CreditFc : dtoLine.Credit,
                 CostCenterNo = dtoLine.CostCenterNo,
                 PartyType = dtoLine.PartyType,
                 PartyNo = dtoLine.PartyNo,

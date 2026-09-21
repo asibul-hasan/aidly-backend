@@ -12,12 +12,13 @@ namespace AidlyErp.Fin.Application.Interfaces;
 public interface IFinAccountRepository
 {
     Task<List<FinAccount>> FindByCompanyAsync(long companyNo, CancellationToken ct = default);
+    Task<List<FinAccount>> FindByCompanyOrderedAsync(long companyNo, CancellationToken ct = default);
     Task<List<FinAccount>> FindByCompanyPaginatedAsync(long companyNo, int skip, int take, CancellationToken ct = default);
     Task<FinAccount?> FindByIdAsync(long accountNo, CancellationToken ct = default);
     Task<FinAccount?> FindByIdAndCompanyAsync(long accountNo, long companyNo, CancellationToken ct = default);
     Task<bool> ExistsByCodeAndCompanyAsync(string accountCode, long companyNo, CancellationToken ct = default);
-    Task<bool> ExistsByAccountGroupAsync(long accountGroupNo, CancellationToken ct = default);
-    Task<bool> ExistsByAccountGroupAndCompanyAsync(long accountGroupNo, long companyNo, CancellationToken ct = default);
+    Task<bool> ExistsByParentAccountAsync(long parentAccountNo, CancellationToken ct = default);
+    Task<bool> ExistsByParentAccountAndCompanyAsync(long parentAccountNo, long companyNo, CancellationToken ct = default);
     Task<List<FinAccount>> FindByCompanyAndControlTypeAsync(long companyNo, short controlType, CancellationToken ct = default);
     void Add(FinAccount entity);
     void Update(FinAccount entity);
@@ -25,15 +26,15 @@ public interface IFinAccountRepository
 
 public interface IFinAccountGroupRepository
 {
-    Task<List<FinAccountGroup>> FindByCompanyOrderedAsync(long companyNo, CancellationToken ct = default);
-    Task<List<FinAccountGroup>> FindByCompanyAsync(long companyNo, CancellationToken ct = default);
-    Task<FinAccountGroup?> FindByIdAsync(long accountGroupNo, CancellationToken ct = default);
-    Task<FinAccountGroup?> FindByIdAndCompanyAsync(long accountGroupNo, long companyNo, CancellationToken ct = default);
+    Task<List<FinAccount>> FindByCompanyOrderedAsync(long companyNo, CancellationToken ct = default);
+    Task<List<FinAccount>> FindByCompanyAsync(long companyNo, CancellationToken ct = default);
+    Task<FinAccount?> FindByIdAsync(long accountGroupNo, CancellationToken ct = default);
+    Task<FinAccount?> FindByIdAndCompanyAsync(long accountGroupNo, long companyNo, CancellationToken ct = default);
     Task<bool> ExistsByCodeAndCompanyAsync(string accountGroupId, long companyNo, CancellationToken ct = default);
     Task<bool> ExistsByParentGroupAsync(long parentGroupNo, CancellationToken ct = default);
     Task<bool> ExistsByParentGroupAndCompanyAsync(long parentGroupNo, long companyNo, CancellationToken ct = default);
-    void Add(FinAccountGroup entity);
-    void Update(FinAccountGroup entity);
+    void Add(FinAccount entity);
+    void Update(FinAccount entity);
 }
 
 public interface IFinAccountBalanceRepository

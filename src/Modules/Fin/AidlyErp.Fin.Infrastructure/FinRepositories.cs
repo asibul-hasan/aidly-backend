@@ -18,6 +18,9 @@ public class FinAccountRepository : IFinAccountRepository
     public async Task<List<FinAccount>> FindByCompanyAsync(long companyNo, CancellationToken ct = default) =>
         await _db.FinAccounts.AsNoTracking().Where(x => x.CompanyNo == companyNo && x.IsDeleted == 0).OrderBy(x => x.AccountCode).ToListAsync(ct);
 
+    public async Task<List<FinAccount>> FindByCompanyOrderedAsync(long companyNo, CancellationToken ct = default) =>
+        await _db.FinAccounts.AsNoTracking().Where(x => x.CompanyNo == companyNo && x.IsDeleted == 0).OrderBy(x => x.DisplayOrder).ThenBy(x => x.AccountCode).ToListAsync(ct);
+
     public async Task<List<FinAccount>> FindByCompanyPaginatedAsync(long companyNo, int skip, int take, CancellationToken ct = default) =>
         await _db.FinAccounts.AsNoTracking().Where(x => x.CompanyNo == companyNo && x.IsDeleted == 0).OrderBy(x => x.AccountCode).Skip(skip).Take(take).ToListAsync(ct);
 
@@ -30,11 +33,11 @@ public class FinAccountRepository : IFinAccountRepository
     public async Task<bool> ExistsByCodeAndCompanyAsync(string accountCode, long companyNo, CancellationToken ct = default) =>
         await _db.FinAccounts.AnyAsync(x => x.AccountCode == accountCode && x.CompanyNo == companyNo && x.IsDeleted == 0, ct);
 
-    public async Task<bool> ExistsByAccountGroupAsync(long accountGroupNo, CancellationToken ct = default) =>
-        await _db.FinAccounts.AnyAsync(x => x.AccountGroupNo == accountGroupNo && x.IsDeleted == 0, ct);
+    public async Task<bool> ExistsByParentAccountAsync(long parentAccountNo, CancellationToken ct = default) =>
+        await _db.FinAccounts.AnyAsync(x => x.ParentAccountNo == parentAccountNo && x.IsDeleted == 0, ct);
 
-    public async Task<bool> ExistsByAccountGroupAndCompanyAsync(long accountGroupNo, long companyNo, CancellationToken ct = default) =>
-        await _db.FinAccounts.AnyAsync(x => x.AccountGroupNo == accountGroupNo && x.CompanyNo == companyNo && x.IsDeleted == 0, ct);
+    public async Task<bool> ExistsByParentAccountAndCompanyAsync(long parentAccountNo, long companyNo, CancellationToken ct = default) =>
+        await _db.FinAccounts.AnyAsync(x => x.ParentAccountNo == parentAccountNo && x.CompanyNo == companyNo && x.IsDeleted == 0, ct);
 
     public async Task<List<FinAccount>> FindByCompanyAndControlTypeAsync(long companyNo, short controlType, CancellationToken ct = default) =>
         await _db.FinAccounts.AsNoTracking().Where(x => x.CompanyNo == companyNo && x.ControlType == controlType && x.IsDeleted == 0).OrderBy(x => x.AccountCode).ToListAsync(ct);
@@ -48,29 +51,38 @@ public class FinAccountGroupRepository : IFinAccountGroupRepository
     private readonly IFinDbContext _db;
     public FinAccountGroupRepository(IFinDbContext db) => _db = db;
 
-    public async Task<List<FinAccountGroup>> FindByCompanyOrderedAsync(long companyNo, CancellationToken ct = default) =>
-        await _db.FinAccountGroups.AsNoTracking().Where(x => x.CompanyNo == companyNo && x.IsDeleted == 0).OrderBy(x => x.DisplayOrder).ThenBy(x => x.AccountGroupNo).ToListAsync(ct);
+    public async Task<List<FinAccount>> FindByCompanyOrderedAsync(long companyNo, CancellationToken ct = default) =>
+        await _db.FinAccounts.AsNoTracking().Where(x => x.CompanyNo == companyNo && x.IsGroup == 1 && x.IsDeleted == 0).OrderBy(x => x.DisplayOrder).ThenBy(x => x.AccountNo).ToListAsync(ct);
 
-    public async Task<List<FinAccountGroup>> FindByCompanyAsync(long companyNo, CancellationToken ct = default) =>
-        await _db.FinAccountGroups.AsNoTracking().Where(x => x.CompanyNo == companyNo && x.IsDeleted == 0).OrderBy(x => x.AccountGroupNo).ToListAsync(ct);
+    public async Task<List<FinAccount>> FindByCompanyAsync(long companyNo, CancellationToken ct = default) =>
+        await _db.FinAccounts.AsNoTracking().Where(x => x.CompanyNo == companyNo && x.IsGroup == 1 && x.IsDeleted == 0).OrderBy(x => x.AccountNo).ToListAsync(ct);
 
-    public async Task<FinAccountGroup?> FindByIdAsync(long accountGroupNo, CancellationToken ct = default) =>
-        await _db.FinAccountGroups.AsNoTracking().FirstOrDefaultAsync(x => x.AccountGroupNo == accountGroupNo && x.IsDeleted == 0, ct);
+    public async Task<FinAccount?> FindByIdAsync(long accountGroupNo, CancellationToken ct = default) =>
+        await _db.FinAccounts.AsNoTracking().FirstOrDefaultAsync(x => x.AccountNo == accountGroupNo && x.IsGroup == 1 && x.IsDeleted == 0, ct);
 
-    public async Task<FinAccountGroup?> FindByIdAndCompanyAsync(long accountGroupNo, long companyNo, CancellationToken ct = default) =>
-        await _db.FinAccountGroups.AsNoTracking().FirstOrDefaultAsync(x => x.AccountGroupNo == accountGroupNo && x.CompanyNo == companyNo && x.IsDeleted == 0, ct);
+    public async Task<FinAccount?> FindByIdAndCompanyAsync(long accountGroupNo, long companyNo, CancellationToken ct = default) =>
+        await _db.FinAccounts.AsNoTracking().FirstOrDefaultAsync(x => x.AccountNo == accountGroupNo && x.CompanyNo == companyNo && x.IsGroup == 1 && x.IsDeleted == 0, ct);
 
     public async Task<bool> ExistsByCodeAndCompanyAsync(string accountGroupId, long companyNo, CancellationToken ct = default) =>
-        await _db.FinAccountGroups.AnyAsync(x => x.GroupCode == accountGroupId && x.CompanyNo == companyNo && x.IsDeleted == 0, ct);
+        await _db.FinAccounts.AnyAsync(x => x.AccountCode == accountGroupId && x.CompanyNo == companyNo && x.IsGroup == 1 && x.IsDeleted == 0, ct);
 
     public async Task<bool> ExistsByParentGroupAsync(long parentGroupNo, CancellationToken ct = default) =>
-        await _db.FinAccountGroups.AnyAsync(x => x.ParentGroupNo == parentGroupNo && x.IsDeleted == 0, ct);
+        await _db.FinAccounts.AnyAsync(x => x.ParentAccountNo == parentGroupNo && x.IsDeleted == 0, ct);
 
     public async Task<bool> ExistsByParentGroupAndCompanyAsync(long parentGroupNo, long companyNo, CancellationToken ct = default) =>
-        await _db.FinAccountGroups.AnyAsync(x => x.ParentGroupNo == parentGroupNo && x.CompanyNo == companyNo && x.IsDeleted == 0, ct);
+        await _db.FinAccounts.AnyAsync(x => x.ParentAccountNo == parentGroupNo && x.CompanyNo == companyNo && x.IsDeleted == 0, ct);
 
-    public void Add(FinAccountGroup entity) => _db.FinAccountGroups.Add(entity);
-    public void Update(FinAccountGroup entity) => _db.FinAccountGroups.Update(entity);
+    public void Add(FinAccount entity)
+    {
+        entity.IsGroup = 1;
+        _db.FinAccounts.Add(entity);
+    }
+
+    public void Update(FinAccount entity)
+    {
+        entity.IsGroup = 1;
+        _db.FinAccounts.Update(entity);
+    }
 }
 
 public class FinAccountBalanceRepository : IFinAccountBalanceRepository

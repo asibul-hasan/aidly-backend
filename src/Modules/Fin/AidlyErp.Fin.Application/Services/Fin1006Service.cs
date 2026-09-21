@@ -65,17 +65,18 @@ public class Fin1006Service : IFin1006Service
                 ?? throw new NotFoundException($"GL Map not found: {dto.MapNo}");
 
             // Validate account if changed
-            if (dto.AccountNo != map.AccountNo)
+            if (dto.AccountNo.HasValue && dto.AccountNo.Value > 0 && dto.AccountNo.Value != map.AccountNo)
             {
-                var acc = await _db.FinAccounts.FirstOrDefaultAsync(a => a.AccountNo == dto.AccountNo && a.CompanyNo == companyNo && a.IsDeleted == 0, ct)
-                    ?? throw new NotFoundException($"Account not found: {dto.AccountNo}");
+                var acc = await _db.FinAccounts.FirstOrDefaultAsync(a => a.AccountNo == dto.AccountNo.Value && a.CompanyNo == companyNo && a.IsDeleted == 0, ct)
+                    ?? throw new NotFoundException($"Account not found: {dto.AccountNo.Value}");
                 if (acc.IsActive != 1) throw new ValidationException("The mapped account is inactive");
                 if (acc.IsPostable != 1) throw new ValidationException("A header account cannot be a posting target");
+                map.AccountNo = dto.AccountNo.Value;
             }
 
             // Update uniqueness check (self-aware) — if key fields changed
             string newLegKey = dto.LegKey?.Trim().ToUpperInvariant() ?? map.LegKey;
-            string newSubKey = dto.SubKey?.Trim() ?? map.SubKey ?? string.Empty;
+            string newSubKey = dto.SubKey != null ? dto.SubKey.Trim() : (map.SubKey ?? string.Empty);
             if (newLegKey != map.LegKey || newSubKey != (map.SubKey ?? string.Empty))
             {
                 if (await _db.FinGlMaps.AnyAsync(m => m.CompanyNo == companyNo && m.EventType == map.EventType && m.LegKey == newLegKey && m.SubKey == newSubKey && m.GlMapNo != map.GlMapNo && m.IsDeleted == 0, ct))
@@ -84,8 +85,7 @@ public class Fin1006Service : IFin1006Service
                 map.SubKey = newSubKey;
             }
 
-            map.AccountNo = dto.AccountNo;
-            map.IsActive = dto.IsActive;
+            if (dto.IsActive.HasValue) map.IsActive = dto.IsActive.Value;
             map.UpdatedBy = _ctx.CurrentUserNo(); map.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
 
@@ -97,9 +97,11 @@ public class Fin1006Service : IFin1006Service
             long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context is required");
             if (string.IsNullOrWhiteSpace(dto.EventType)) throw new ValidationException("Event type is required");
             if (string.IsNullOrWhiteSpace(dto.LegKey)) throw new ValidationException("Leg key is required");
+            if (!dto.AccountNo.HasValue || dto.AccountNo.Value <= 0)
+                throw new ValidationException("GL account is required");
 
-            var acc = await _db.FinAccounts.FirstOrDefaultAsync(a => a.AccountNo == dto.AccountNo && a.CompanyNo == companyNo && a.IsDeleted == 0, ct)
-                ?? throw new NotFoundException($"Account not found: {dto.AccountNo}");
+            var acc = await _db.FinAccounts.FirstOrDefaultAsync(a => a.AccountNo == dto.AccountNo.Value && a.CompanyNo == companyNo && a.IsDeleted == 0, ct)
+                ?? throw new NotFoundException($"Account not found: {dto.AccountNo.Value}");
             if (acc.IsActive != 1) throw new ValidationException("The mapped account is inactive");
             if (acc.IsPostable != 1) throw new ValidationException("A header account cannot be a posting target");
 
@@ -118,8 +120,8 @@ public class Fin1006Service : IFin1006Service
                 EventType = eventType,
                 LegKey = legKey,
                 SubKey = subKey,
-                AccountNo = dto.AccountNo,
-                IsActive = dto.IsActive,
+                AccountNo = dto.AccountNo.Value,
+                IsActive = dto.IsActive ?? 1,
                 IsDeleted = 0,
                 CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow
             };

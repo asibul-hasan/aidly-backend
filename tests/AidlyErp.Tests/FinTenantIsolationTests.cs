@@ -114,7 +114,6 @@ public class FinTenantIsolationTests
         public FinInMemoryDbContext(DbContextOptions<FinInMemoryDbContext> options) : base(options) { }
 
         public DbSet<FinAccount> FinAccounts => Set<FinAccount>();
-        public DbSet<FinAccountGroup> FinAccountGroups => Set<FinAccountGroup>();
         public DbSet<FinAccountBalance> FinAccountBalances => Set<FinAccountBalance>();
         public DbSet<FinGlMap> FinGlMaps => Set<FinGlMap>();
         public DbSet<FinVoucher> FinVouchers => Set<FinVoucher>();

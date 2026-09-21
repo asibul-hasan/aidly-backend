@@ -48,20 +48,20 @@ public class Fin1308ChartOfAccountsPdfService : IFin1308ChartOfAccountsPdfServic
     public async Task<List<Fin1308ChartOfAccountsRowDto>> GetCoaExportRowsAsync(CancellationToken ct = default)
     {
         long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context is required");
-        var groups = await _db.FinAccountGroups.AsNoTracking()
-            .Where(g => g.CompanyNo == companyNo && g.IsDeleted == 0)
-            .ToDictionaryAsync(g => g.AccountGroupNo, g => g.GroupName, ct);
+        var groups = await _db.FinAccounts.AsNoTracking()
+            .Where(g => g.CompanyNo == companyNo && g.IsGroup == 1 && g.IsDeleted == 0)
+            .ToDictionaryAsync(g => g.AccountNo, g => g.AccountName, ct);
 
         return await _db.FinAccounts
             .AsNoTracking()
-            .Where(a => a.CompanyNo == companyNo && a.IsDeleted == 0)
+            .Where(a => a.CompanyNo == companyNo && a.IsGroup == 0 && a.IsDeleted == 0)
             .OrderBy(a => a.AccountCode)
             .Select(a => new Fin1308ChartOfAccountsRowDto
             {
                 AccountNo = a.AccountNo,
                 AccountCode = a.AccountCode,
                 AccountName = a.AccountName,
-                GroupName = groups.ContainsKey(a.AccountGroupNo) ? groups[a.AccountGroupNo] : null,
+                GroupName = a.ParentAccountNo.HasValue && groups.ContainsKey(a.ParentAccountNo.Value) ? groups[a.ParentAccountNo.Value] : null,
                 RootTypeName = RootTypeName(a.RootType),
                 NormalBalance = a.NormalBalance,
                 IsPostable = a.IsPostable

@@ -71,6 +71,8 @@ public class RbacAuthorizationMiddleware
         var contextOk = userNo != null && companyNo != null && (branchNo != null || companyWide);
         if (!contextOk)
         {
+            logger.LogWarning("RBAC 403 contextOk failed for {Path}: userNo={UserNo}, companyNo={CompanyNo}, branchNo={BranchNo}, companyWide={CompanyWide}",
+                context.Request.Path, userNo, companyNo, branchNo, companyWide);
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
@@ -88,6 +90,8 @@ public class RbacAuthorizationMiddleware
             var allowedByBits = (mask & PermissionBits.View) != 0 && PermissionBits.Allows(mask, action);
             if (!allowedByBits)
             {
+                logger.LogWarning("RBAC 403 allowedByBits failed for {Path}: formId={FormId}, action={Action}, mask={Mask}",
+                    context.Request.Path, formId, action, mask);
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return;
             }
@@ -109,6 +113,8 @@ public class RbacAuthorizationMiddleware
                                                    context.RequestAborted);
         if (!access.Allowed)
         {
+            logger.LogWarning("RBAC 403 DB access.Allowed failed for {Path}: formId={FormId}, action={Action}, userNo={UserNo}",
+                context.Request.Path, formId, action, userNo);
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }

@@ -339,7 +339,7 @@ public class Inv1102Service : IInv1102Service
                 throw new ValidationException("Each line needs a direction (increase or decrease)");
 
             decimal qtyBase = InvUomMath.ToBaseQty(product, r.UomNo, r.Qty, factors);
-            decimal lineValue = Math.Round(qtyBase * r.UnitCost, 4);
+            decimal lineValue = qtyBase * r.UnitCost;
             short direction = r.Direction;
 
             _db.InvStockAdjustmentDtls.Add(new InvStockAdjustmentDtl

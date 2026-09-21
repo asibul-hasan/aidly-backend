@@ -165,6 +165,7 @@ public class Inv2006Service : IInv2006Service
                 SystemQty = cell.QtyOnHand,
                 // Defaults to the system figure so an uncounted line posts no variance.
                 CountedQty = cell.QtyOnHand,
+                VarianceQty = 0m,
                 UnitCost = cell.AvgCost
             });
         }
@@ -192,6 +193,7 @@ public class Inv2006Service : IInv2006Service
 
             // Only the count and its note are the counter's to change; the snapshot is not.
             line.CountedQty = row.CountedQty;
+            line.VarianceQty = row.VarianceQty != 0m ? row.VarianceQty : (row.CountedQty - line.SystemQty);
             line.Remarks = row.Remarks;
         }
 

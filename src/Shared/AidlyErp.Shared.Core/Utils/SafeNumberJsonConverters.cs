@@ -73,10 +73,19 @@ public class SafeShortJsonConverter : JsonConverter<short>
         {
             return 0;
         }
+        if (reader.TokenType == JsonTokenType.True)
+        {
+            return 1;
+        }
+        if (reader.TokenType == JsonTokenType.False)
+        {
+            return 0;
+        }
         if (reader.TokenType == JsonTokenType.String)
         {
             string? str = reader.GetString();
             if (string.IsNullOrWhiteSpace(str)) return 0;
+            if (bool.TryParse(str, out bool bVal)) return (short)(bVal ? 1 : 0);
             if (short.TryParse(str, out short val)) return val;
             return 0;
         }
@@ -119,6 +128,123 @@ public class SafeDecimalJsonConverter : JsonConverter<decimal>
 
     public override void Write(Utf8JsonWriter writer, decimal value, JsonSerializerOptions options)
     {
-        writer.WriteNumberValue(value);
+        // Strip artificial trailing zeros without losing any precision
+        writer.WriteNumberValue(value / 1.000000000000000000000000000000000m);
+    }
+}
+
+public class SafeNullableDecimalJsonConverter : JsonConverter<decimal?>
+{
+    public override bool HandleNull => true;
+
+    public override decimal? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            string? str = reader.GetString();
+            if (string.IsNullOrWhiteSpace(str)) return null;
+            if (decimal.TryParse(str, out decimal val)) return val;
+            return null;
+        }
+        if (reader.TokenType == JsonTokenType.Number)
+        {
+            return reader.GetDecimal();
+        }
+        return null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, decimal? value, JsonSerializerOptions options)
+    {
+        if (!value.HasValue)
+        {
+            writer.WriteNullValue();
+            return;
+        }
+        writer.WriteNumberValue(value.Value / 1.000000000000000000000000000000000m);
+    }
+}
+
+public class SafeNullableLongJsonConverter : JsonConverter<long?>
+{
+    public override bool HandleNull => true;
+
+    public override long? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null) return null;
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            string? str = reader.GetString();
+            if (string.IsNullOrWhiteSpace(str)) return null;
+            if (long.TryParse(str, out long val)) return val;
+            return null;
+        }
+        if (reader.TokenType == JsonTokenType.Number) return reader.GetInt64();
+        return null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, long? value, JsonSerializerOptions options)
+    {
+        if (value.HasValue) writer.WriteNumberValue(value.Value);
+        else writer.WriteNullValue();
+    }
+}
+
+public class SafeNullableIntJsonConverter : JsonConverter<int?>
+{
+    public override bool HandleNull => true;
+
+    public override int? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null) return null;
+        if (reader.TokenType == JsonTokenType.True) return 1;
+        if (reader.TokenType == JsonTokenType.False) return 0;
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            string? str = reader.GetString();
+            if (string.IsNullOrWhiteSpace(str)) return null;
+            if (bool.TryParse(str, out bool bVal)) return bVal ? 1 : 0;
+            if (int.TryParse(str, out int val)) return val;
+            return null;
+        }
+        if (reader.TokenType == JsonTokenType.Number) return reader.GetInt32();
+        return null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, int? value, JsonSerializerOptions options)
+    {
+        if (value.HasValue) writer.WriteNumberValue(value.Value);
+        else writer.WriteNullValue();
+    }
+}
+
+public class SafeNullableShortJsonConverter : JsonConverter<short?>
+{
+    public override bool HandleNull => true;
+
+    public override short? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null) return null;
+        if (reader.TokenType == JsonTokenType.True) return 1;
+        if (reader.TokenType == JsonTokenType.False) return 0;
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            string? str = reader.GetString();
+            if (string.IsNullOrWhiteSpace(str)) return null;
+            if (bool.TryParse(str, out bool bVal)) return (short)(bVal ? 1 : 0);
+            if (short.TryParse(str, out short val)) return val;
+            return null;
+        }
+        if (reader.TokenType == JsonTokenType.Number) return reader.GetInt16();
+        return null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, short? value, JsonSerializerOptions options)
+    {
+        if (value.HasValue) writer.WriteNumberValue(value.Value);
+        else writer.WriteNullValue();
     }
 }

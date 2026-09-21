@@ -66,27 +66,29 @@ public class Fin1005Service : IFin1005Service
                 ?? throw new NotFoundException($"Bank account not found: {dto.BankAccountNo}");
 
             // If GL account link changed, validate the new one
-            if (dto.AccountNo != bank.AccountNo && dto.AccountNo > 0)
+            if (dto.AccountNo.HasValue && dto.AccountNo.Value > 0 && dto.AccountNo.Value != bank.AccountNo)
             {
-                var newAcc = await _db.FinAccounts.FirstOrDefaultAsync(a => a.AccountNo == dto.AccountNo && a.CompanyNo == companyNo && a.IsDeleted == 0, ct)
-                    ?? throw new NotFoundException($"Account not found: {dto.AccountNo}");
+                var newAcc = await _db.FinAccounts.FirstOrDefaultAsync(a => a.AccountNo == dto.AccountNo.Value && a.CompanyNo == companyNo && a.IsDeleted == 0, ct)
+                    ?? throw new NotFoundException($"Account not found: {dto.AccountNo.Value}");
                 if (newAcc.IsActive != 1) throw new ValidationException("The linked GL account is inactive");
                 if (newAcc.ControlType is not (3 or 4))
                     throw new ValidationException("The linked GL account must be a Bank (3) or Cash (4) control account");
                 // 1:1 link enforcement — only check if account actually changed
-                if (await _db.FinBankAccounts.AnyAsync(b => b.AccountNo == dto.AccountNo && b.CompanyNo == companyNo && b.BankAccountNo != bank.BankAccountNo && b.IsDeleted == 0, ct))
+                if (await _db.FinBankAccounts.AnyAsync(b => b.AccountNo == dto.AccountNo.Value && b.CompanyNo == companyNo && b.BankAccountNo != bank.BankAccountNo && b.IsDeleted == 0, ct))
                     throw new ValidationException("This GL Bank/Cash account is already linked to a bank account setup");
-                bank.AccountNo = dto.AccountNo;
+                bank.AccountNo = dto.AccountNo.Value;
             }
 
             if (dto.BankName != null) bank.BankName = dto.BankName.Trim();
             if (dto.BranchName != null) bank.BranchName = dto.BranchName.Trim();
             if (dto.AccountNumber != null) bank.AccountNumber = dto.AccountNumber.Trim();
-            bank.AccountTitle = dto.AccountTitle?.Trim();
-            bank.RoutingNumber = dto.RoutingNumber?.Trim();
-            bank.SwiftCode = dto.SwiftCode;
-            bank.CurrencyNo = dto.CurrencyNo;
-            bank.IsActive = dto.IsActive;
+            if (dto.AccountTitle != null) bank.AccountTitle = dto.AccountTitle.Trim();
+            if (dto.RoutingNumber != null) bank.RoutingNumber = dto.RoutingNumber.Trim();
+            if (dto.SwiftCode != null) bank.SwiftCode = dto.SwiftCode;
+            if (dto.Iban != null) bank.Iban = dto.Iban;
+            if (dto.CurrencyNo.HasValue) bank.CurrencyNo = dto.CurrencyNo;
+            if (dto.OpeningBalance.HasValue) bank.OpeningBalance = dto.OpeningBalance.Value;
+            if (dto.IsActive.HasValue) bank.IsActive = dto.IsActive.Value;
             bank.UpdatedBy = _ctx.CurrentUserNo(); bank.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
 
@@ -101,20 +103,22 @@ public class Fin1005Service : IFin1005Service
                 throw new ValidationException("Bank account ID is required");
             if (string.IsNullOrWhiteSpace(dto.BankName)) throw new ValidationException("Bank name is required");
             if (string.IsNullOrWhiteSpace(dto.AccountNumber)) throw new ValidationException("Account number is required");
+            if (!dto.AccountNo.HasValue || dto.AccountNo.Value <= 0)
+                throw new ValidationException("GL Bank/Cash account is required");
 
             string bankAccountId = dto.BankAccountId.Trim().ToUpperInvariant();
 
             if (await _db.FinBankAccounts.AnyAsync(b => b.BankAccountId == bankAccountId && b.CompanyNo == companyNo && b.IsDeleted == 0, ct))
                 throw new ValidationException($"Bank account ID already exists: {bankAccountId}");
 
-            var acc = await _db.FinAccounts.FirstOrDefaultAsync(a => a.AccountNo == dto.AccountNo && a.CompanyNo == companyNo && a.IsDeleted == 0, ct)
-                ?? throw new NotFoundException($"Account not found: {dto.AccountNo}");
+            var acc = await _db.FinAccounts.FirstOrDefaultAsync(a => a.AccountNo == dto.AccountNo.Value && a.CompanyNo == companyNo && a.IsDeleted == 0, ct)
+                ?? throw new NotFoundException($"Account not found: {dto.AccountNo.Value}");
             if (acc.IsActive != 1) throw new ValidationException("The linked GL account is inactive");
             if (acc.ControlType is not (3 or 4))
                 throw new ValidationException("The linked GL account must be a Bank (3) or Cash (4) control account");
 
             // 1:1 link enforcement
-            if (await _db.FinBankAccounts.AnyAsync(b => b.AccountNo == dto.AccountNo && b.CompanyNo == companyNo && b.IsDeleted == 0, ct))
+            if (await _db.FinBankAccounts.AnyAsync(b => b.AccountNo == dto.AccountNo.Value && b.CompanyNo == companyNo && b.IsDeleted == 0, ct))
                 throw new ValidationException("This GL Bank/Cash account is already linked to a bank account setup");
 
             var bank = new FinBankAccount
@@ -122,7 +126,7 @@ public class Fin1005Service : IFin1005Service
                 CompanyNo = companyNo,
                 BranchNo = branchNo,
                 BankAccountId = bankAccountId,
-                AccountNo = dto.AccountNo,
+                AccountNo = dto.AccountNo.Value,
                 BankName = dto.BankName.Trim(),
                 BranchName = dto.BranchName?.Trim(),
                 AccountTitle = dto.AccountTitle?.Trim(),
@@ -130,8 +134,8 @@ public class Fin1005Service : IFin1005Service
                 RoutingNumber = dto.RoutingNumber?.Trim(),
                 SwiftCode = dto.SwiftCode,
                 CurrencyNo = dto.CurrencyNo,
-                OpeningBalance = dto.OpeningBalance,
-                IsActive = dto.IsActive,
+                OpeningBalance = dto.OpeningBalance ?? 0m,
+                IsActive = dto.IsActive ?? 1,
                 IsDeleted = 0,
                 CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow
             };

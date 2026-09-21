@@ -318,5 +318,5 @@ public class SalPromotionEngine : ISalPromotionEngine
         return rows.GroupBy(d => d.PromotionNo).ToDictionary(g => g.Key, g => g.ToList());
     }
 
-    private static decimal Round(decimal value) => Math.Round(value, 4, MidpointRounding.AwayFromZero);
+    private static decimal Round(decimal value) => value;
 }

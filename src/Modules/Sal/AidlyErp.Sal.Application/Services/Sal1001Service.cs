@@ -535,39 +535,30 @@ public class Sal1001Service : ISal1001Service
             await _arLedger.DebitAsync(inv.CustomerNo, inv.DueAmount, 2, inv.InvoiceNo.ToString(), inv.InvoiceNo, $"Sales Invoice {inv.InvoiceId}", ct);
         }
 
-        // Group VAT by tax code (VatTaxNo) for per-rate GL segregation
-        var vatByTax = lines
-            .Where(l => l.VatTaxNo.HasValue && l.TaxAmount > 0)
-            .GroupBy(l => l.VatTaxNo!.Value)
-            .Select(g => new { VatTaxNo = g.Key, Amount = g.Sum(x => x.TaxAmount) })
-            .ToList();
-
-        // Batch-load tax codes for SubKey resolution
-        var taxNos = vatByTax.Select(v => v.VatTaxNo).ToList();
-        var taxCodes = await _vatTaxLookup.GetTaxCodesAsync(taxNos, ct);
+        var vatByTax = GroupVatByTaxCode(lines);
+        var taxCodes = await ResolveTaxCodesAsync(vatByTax, ct);
 
         // COGS as costed by the stock engine — not the selling value of the lines.
         decimal totalCogs = stockResult.TotalCost;
 
+        // The debits total GrandTotal, so the credits have to as well:
+        //
+        //     GrandTotal = TaxableAmount + TaxAmount + ShippingCharge + RoundOff
+        //
+        // REVENUE is therefore TaxableAmount, NOT SubTotal − LineDiscountTotal. That older
+        // figure still carries the promotion and bill discounts, and under tax-inclusive
+        // pricing it carries the VAT too. Shipping and round-off need legs of their own or the
+        // voucher is short by exactly those amounts — and FIN rejects an unbalanced voucher, so
+        // the sale would relieve stock and move AR while never reaching the ledger at all.
         var legs = new List<GlPostingPayload.Leg>
         {
             new() { LegKey = "RECEIVABLE", Amount = inv.DueAmount, DrCr = "dr", PartyType = 1, PartyNo = inv.CustomerNo },
             new() { LegKey = "CASH", Amount = inv.PaidAmount, DrCr = "dr" },
-            new() { LegKey = "REVENUE", Amount = inv.SubTotal - inv.LineDiscountTotal, DrCr = "cr" }
+            new() { LegKey = "REVENUE", Amount = inv.TaxableAmount, DrCr = "cr" }
         };
 
-        // One VAT_OUTPUT leg per tax code, with SubKey = tax code string
-        foreach (var vat in vatByTax)
-        {
-            var subKey = taxCodes.TryGetValue(vat.VatTaxNo, out var code) ? code : vat.VatTaxNo.ToString();
-            legs.Add(new() { LegKey = "VAT_OUTPUT", SubKey = subKey, Amount = vat.Amount, DrCr = "cr" });
-        }
-
-        // If no per-line VAT, fall back to aggregated TaxAmount
-        if (vatByTax.Count == 0 && inv.TaxAmount > 0)
-        {
-            legs.Add(new() { LegKey = "VAT_OUTPUT", Amount = inv.TaxAmount, DrCr = "cr" });
-        }
+        AddVatLegs(legs, vatByTax, taxCodes, inv.TaxAmount, credit: true);
+        AddShippingAndRoundOffLegs(legs, inv, credit: true);
 
         // COGS legs (Dr COGS / Cr INVENTORY)
         if (totalCogs > 0)
@@ -689,17 +680,25 @@ public class Sal1001Service : ISal1001Service
             .ToListAsync(ct);
 
         decimal totalCogs = lines.Sum(l => l.LineCost);
-        decimal revenue = inv.SubTotal - inv.LineDiscountTotal;
 
+        var vatByTax = GroupVatByTaxCode(lines);
+        var taxCodes = await ResolveTaxCodesAsync(vatByTax, ct);
+
+        // The leg SET has to mirror the posting, not just the directions: a reversal that leaves
+        // out shipping or round-off is exactly as unbalanced as a posting that did, and it would
+        // resolve VAT through the generic mapping while the posting used the per-rate one — so
+        // the two would land on different accounts and the VAT control would never net to zero.
         var legs = new List<GlPostingPayload.Leg>();
         if (inv.DueAmount > 0)
             legs.Add(new() { LegKey = "RECEIVABLE", Amount = inv.DueAmount, DrCr = "cr", PartyType = 1, PartyNo = inv.CustomerNo });
         if (inv.PaidAmount > 0)
             legs.Add(new() { LegKey = "CASH", Amount = inv.PaidAmount, DrCr = "cr" });
-        if (revenue > 0)
-            legs.Add(new() { LegKey = "REVENUE", Amount = revenue, DrCr = "dr" });
-        if (inv.TaxAmount > 0)
-            legs.Add(new() { LegKey = "VAT_OUTPUT", Amount = inv.TaxAmount, DrCr = "dr" });
+        if (inv.TaxableAmount > 0)
+            legs.Add(new() { LegKey = "REVENUE", Amount = inv.TaxableAmount, DrCr = "dr" });
+
+        AddVatLegs(legs, vatByTax, taxCodes, inv.TaxAmount, credit: false);
+        AddShippingAndRoundOffLegs(legs, inv, credit: false);
+
         if (totalCogs > 0)
         {
             legs.Add(new() { LegKey = "COGS", Amount = totalCogs, DrCr = "cr" });
@@ -871,6 +870,55 @@ public class Sal1001Service : ISal1001Service
             .ToListAsync(ct);
     }
 
+    private static List<(long VatTaxNo, decimal Amount)> GroupVatByTaxCode(List<SalInvoiceDtl> lines)
+    {
+        return lines
+            .Where(l => l.VatTaxNo.HasValue && l.TaxAmount > 0)
+            .GroupBy(l => l.VatTaxNo!.Value)
+            .Select(g => (VatTaxNo: g.Key, Amount: g.Sum(x => x.TaxAmount)))
+            .ToList();
+    }
+
+    private async Task<Dictionary<long, string>> ResolveTaxCodesAsync(List<(long VatTaxNo, decimal Amount)> vatByTax, CancellationToken ct)
+    {
+        var taxNos = vatByTax.Select(v => v.VatTaxNo).ToList();
+        return await _vatTaxLookup.GetTaxCodesAsync(taxNos, ct);
+    }
+
+    private static void AddVatLegs(List<GlPostingPayload.Leg> legs, List<(long VatTaxNo, decimal Amount)> vatByTax, Dictionary<long, string> taxCodes, decimal totalTax, bool credit)
+    {
+        string drCr = credit ? "cr" : "dr";
+        foreach (var vat in vatByTax)
+        {
+            var subKey = taxCodes.TryGetValue(vat.VatTaxNo, out var code) ? code : vat.VatTaxNo.ToString();
+            legs.Add(new() { LegKey = "VAT_OUTPUT", SubKey = subKey, Amount = vat.Amount, DrCr = drCr });
+        }
+        if (vatByTax.Count == 0 && totalTax > 0)
+        {
+            legs.Add(new() { LegKey = "VAT_OUTPUT", Amount = totalTax, DrCr = drCr });
+        }
+    }
+
+    private static void AddShippingAndRoundOffLegs(List<GlPostingPayload.Leg> legs, SalInvoice inv, bool credit)
+    {
+        string incomeDrCr = credit ? "cr" : "dr";
+        if (inv.ShippingCharge > 0)
+        {
+            legs.Add(new() { LegKey = "SHIPPING_INCOME", Amount = inv.ShippingCharge, DrCr = incomeDrCr });
+        }
+        if (inv.RoundOff != 0)
+        {
+            if (inv.RoundOff > 0)
+            {
+                legs.Add(new() { LegKey = "ROUND_OFF", Amount = inv.RoundOff, DrCr = incomeDrCr });
+            }
+            else
+            {
+                legs.Add(new() { LegKey = "ROUND_OFF", Amount = Math.Abs(inv.RoundOff), DrCr = credit ? "dr" : "cr" });
+            }
+        }
+    }
+
     private static Sal1001InvoiceDto ToDto(SalInvoice i, string? customerName, List<Sal1001LineDto>? lines) => new()
     {
         InvoiceNo = i.InvoiceNo,
@@ -902,3 +950,4 @@ public class Sal1001Service : ISal1001Service
         Lines = lines ?? new()
     };
 }
+

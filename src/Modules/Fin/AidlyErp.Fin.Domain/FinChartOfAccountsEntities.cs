@@ -20,8 +20,25 @@ public class FinAccount : AuditEntity
     [StringLength(200)]
     public string AccountName { get; set; } = string.Empty;
 
+    [Column("parent_account_no")]
+    public long? ParentAccountNo { get; set; }
+
     [Column("account_group_no")]
-    public long AccountGroupNo { get; set; }
+    public long? AccountGroupNo { get; set; }
+
+    /// <summary>
+    /// Legacy compatibility property mapping to ParentAccountNo / AccountGroupNo.
+    /// </summary>
+    [NotMapped]
+    public long? ParentGroupNo
+    {
+        get => ParentAccountNo ?? AccountGroupNo;
+        set
+        {
+            ParentAccountNo = value;
+            AccountGroupNo = value;
+        }
+    }
 
     [Column("root_type")]
     public short RootType { get; set; }
@@ -30,17 +47,44 @@ public class FinAccount : AuditEntity
     [StringLength(2)]
     public string NormalBalance { get; set; } = "dr";
 
+    [Column("is_group")]
+    public short IsGroup { get; set; } = 0;
+
     [Column("is_postable")]
     public short IsPostable { get; set; } = 1;
 
+    [Column("is_control")]
+    public short IsControl { get; set; } = 0;
+
     [Column("control_type")]
     public short? ControlType { get; set; }
+
+    [Column("account_category")]
+    public short? AccountCategory { get; set; }
+
+    [Column("sub_category")]
+    public short? SubCategory { get; set; }
+
+    [Column("account_class")]
+    public short? AccountClass { get; set; }
 
     [Column("requires_cost_center")]
     public short RequiresCostCenter { get; set; } = 0;
 
     [Column("requires_party")]
     public short RequiresParty { get; set; } = 0;
+
+    [Column("requires_reconciliation")]
+    public short RequiresReconciliation { get; set; } = 0;
+
+    [Column("requires_branch")]
+    public short RequiresBranch { get; set; } = 0;
+
+    [Column("requires_project")]
+    public short RequiresProject { get; set; } = 0;
+
+    [Column("requires_department")]
+    public short RequiresDepartment { get; set; } = 0;
 
     [Column("currency_no")]
     public long? CurrencyNo { get; set; }
@@ -52,44 +96,11 @@ public class FinAccount : AuditEntity
     [StringLength(2)]
     public string OpeningDrCr { get; set; } = "dr";
 
-    [Column("company_no")]
-    public long CompanyNo { get; set; }
-
-    [Column("branch_no")]
-    public long? BranchNo { get; set; }
-}
-
-[Table("fin_account_group")]
-public class FinAccountGroup : AuditEntity
-{
-    [Key]
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("account_group_no")]
-    public long AccountGroupNo { get; set; }
-
-    [Column("account_group_id")]
-    [StringLength(30)]
-    public string GroupCode { get; set; } = string.Empty;
-
-    [Column("group_name")]
-    [StringLength(200)]
-    public string GroupName { get; set; } = string.Empty;
-
-    [Column("parent_group_no")]
-    public long? ParentGroupNo { get; set; }
-
-    [Column("root_type")]
-    public short RootType { get; set; }
-
-    [Column("normal_balance")]
-    [StringLength(2)]
-    public string? NormalBalance { get; set; }
-
     [Column("order_sl")]
     public int DisplayOrder { get; set; } = 0;
 
-    [Column("is_control")]
-    public short IsControl { get; set; } = 0;
+    [Column("description")]
+    public string? Description { get; set; }
 
     [Column("company_no")]
     public long CompanyNo { get; set; }

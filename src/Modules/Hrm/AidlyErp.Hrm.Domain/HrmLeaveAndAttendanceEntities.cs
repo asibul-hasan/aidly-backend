@@ -83,28 +83,28 @@ public class HrmLeaveBalance : AuditEntity
     [Column("leave_year")]
     public int LeaveYear { get; set; }
 
-    [Column("opening_balance", TypeName = "numeric(18,4)")]
+    [Column("opening_balance")]
     public decimal? OpeningBalance { get; set; }
 
-    [Column("entitled_days", TypeName = "numeric(18,4)")]
+    [Column("entitled_days")]
     public decimal EntitledDays { get; set; } = 0m;
 
-    [Column("accrued_days", TypeName = "numeric(18,4)")]
+    [Column("accrued_days")]
     public decimal AccruedDays { get; set; } = 0m;
 
-    [Column("consumed_days", TypeName = "numeric(18,4)")]
+    [Column("consumed_days")]
     public decimal ConsumedDays { get; set; } = 0m;
 
-    [Column("pending_days", TypeName = "numeric(18,4)")]
+    [Column("pending_days")]
     public decimal PendingDays { get; set; } = 0m;
 
-    [Column("encashed_days", TypeName = "numeric(18,4)")]
+    [Column("encashed_days")]
     public decimal EncashedDays { get; set; } = 0m;
 
-    [Column("lapsed_days", TypeName = "numeric(18,4)")]
+    [Column("lapsed_days")]
     public decimal LapsedDays { get; set; } = 0m;
 
-    [Column("carried_forward", TypeName = "numeric(18,4)")]
+    [Column("carried_forward")]
     public decimal CarriedForward { get; set; } = 0m;
 
     [Column("branch_no")]
@@ -368,16 +368,16 @@ public class HrmOvertime : AuditEntity
     [Column("ot_date")]
     public DateOnly OtDate { get; set; }
 
-    [Column("hours", TypeName = "numeric(9,2)")]
+    [Column("hours")]
     public decimal Hours { get; set; } = 0m;
 
-    [Column("rate_multiplier", TypeName = "numeric(9,2)")]
+    [Column("rate_multiplier")]
     public decimal RateMultiplier { get; set; } = 1.5m;
 
-    [Column("hourly_rate", TypeName = "numeric(20,4)")]
+    [Column("hourly_rate")]
     public decimal HourlyRate { get; set; } = 0m;
 
-    [Column("ot_amount", TypeName = "numeric(20,4)")]
+    [Column("ot_amount")]
     public decimal OtAmount { get; set; } = 0m;
 
     [Column("reason")]

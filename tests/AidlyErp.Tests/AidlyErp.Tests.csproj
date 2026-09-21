@@ -20,7 +20,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Host\AidlyErp.Api\AidlyErp.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Fin\AidlyErp.Fin.Application\AidlyErp.Fin.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Fin\AidlyErp.Fin.Infrastructure\AidlyErp.Fin.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Sys\AidlyErp.Sys.Application\AidlyErp.Sys.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Sys\AidlyErp.Sys.Infrastructure\AidlyErp.Sys.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Sal\AidlyErp.Sal.Application\AidlyErp.Sal.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Pur\AidlyErp.Pur.Application\AidlyErp.Pur.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Inv\AidlyErp.Inv.Application\AidlyErp.Inv.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Hrm\AidlyErp.Hrm.Application\AidlyErp.Hrm.Application.csproj" />
+    <ProjectReference Include="..\..\src\Shared\AidlyErp.Shared.Infrastructure\AidlyErp.Shared.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

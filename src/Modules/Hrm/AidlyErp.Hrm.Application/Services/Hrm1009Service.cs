@@ -174,8 +174,9 @@ public class Hrm1009Service : IHrm1009Service
 
     private static string NormalizeCountry(string? value)
     {
-        var normalized = TrimRequired(value, "Country code").ToUpperInvariant();
-        if (normalized.Length > 2) throw new ValidationException("Country code must not exceed 2 characters");
+        if (string.IsNullOrWhiteSpace(value)) return "DEFAULT";
+        var normalized = value.Trim().ToUpperInvariant();
+        if (normalized.Length > 10) throw new ValidationException("Country code must not exceed 10 characters");
         return normalized;
     }
 

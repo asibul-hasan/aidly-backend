@@ -259,7 +259,7 @@ public class Inv1101Service : IInv1101Service
                 throw new NotFoundException($"Product not found: {r.ProductNo}");
 
             decimal qtyBase = InvUomMath.ToBaseQty(product, r.UomNo, r.Qty, factors);
-            decimal lineValue = Math.Round(qtyBase * r.UnitCost, 4);
+            decimal lineValue = qtyBase * r.UnitCost;
 
             _db.InvStockAdjustmentDtls.Add(new InvStockAdjustmentDtl
             {

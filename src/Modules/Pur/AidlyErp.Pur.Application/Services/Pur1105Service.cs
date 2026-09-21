@@ -252,7 +252,7 @@ public class Pur1105Service : IPur1105Service
             decimal unitCost = r.UnitCost;
             decimal taxable = qty * unitCost;
             decimal taxPct = r.TaxRatePct;
-            decimal tax = Math.Round(taxable * taxPct / 100m, 4);
+            decimal tax = taxable * taxPct / 100m;
 
             var detail = new PurReceiptDtl
             {

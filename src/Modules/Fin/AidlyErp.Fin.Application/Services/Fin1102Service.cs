@@ -66,18 +66,9 @@ public class Fin1102Service : IFin1102Service
         if (acc.ControlType != 3)
             throw new ValidationException($"Account {acc.AccountCode} is not a bank account");
 
-        // Opening balance from ledger: sum(debit) - sum(credit) before statementDate
-        var opening = await _db.FinLedgers.AsNoTracking()
-            .Where(l => l.AccountNo == accountNo && l.CompanyNo == companyNo && l.VoucherDate < statementDate && l.IsDeleted == 0)
-            .GroupBy(_ => 1)
-            .Select(g => new { Debit = g.Sum(x => x.Debit), Credit = g.Sum(x => x.Credit) })
-            .FirstOrDefaultAsync(ct);
-        // Opening balance is ledger-derived only — fin_account.opening_balance is a data-entry seed.
-        decimal openingBalance = (opening?.Debit ?? 0m) - (opening?.Credit ?? 0m);
-
         // Cleared ledger nos — scoped to this company's reconciliations
         var clearedLedgerNos = await _db.FinBankReconLines.AsNoTracking()
-            .Where(l => l.IsCleared == 1 && l.IsDeleted == 0 &&
+            .Where(l => l.ClearedDate != null && l.IsDeleted == 0 &&
                         _db.FinBankRecons.Any(r => r.ReconNo == l.ReconNo && r.CompanyNo == companyNo && r.IsDeleted == 0))
             .Select(l => l.LedgerNo)
             .ToHashSetAsync(ct);
@@ -90,7 +81,7 @@ public class Fin1102Service : IFin1102Service
         var voucherNos = ledgerLines.Select(l => l.VoucherNo).Distinct().ToList();
         var vouchers = await _db.FinVouchers.AsNoTracking().Where(v => voucherNos.Contains(v.VoucherNo)).ToDictionaryAsync(v => v.VoucherNo, ct);
 
-        decimal bookBalance = openingBalance;
+        decimal bookBalance = 0m;
 
         var lineDtos = new List<Fin1102LedgerLineDto>();
         foreach (var l in ledgerLines)

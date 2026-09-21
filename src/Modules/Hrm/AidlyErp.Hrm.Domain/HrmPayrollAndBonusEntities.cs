@@ -44,10 +44,10 @@ public class HrmBonusRun : AuditEntity
     [Column("applicability_type")]
     public short? ApplicabilityType { get; set; }
 
-    [Column("percentage_of_basic", TypeName = "numeric(9,4)")]
+    [Column("percentage_of_basic")]
     public decimal? PercentageOfBasic { get; set; }
 
-    [Column("fixed_amount", TypeName = "numeric(20,4)")]
+    [Column("fixed_amount")]
     public decimal? FixedAmount { get; set; }
 
     [Column("total_amount")]
@@ -94,10 +94,10 @@ public class HrmBonusLine : AuditEntity
     [Column("employee_no")]
     public long EmployeeNo { get; set; }
 
-    [Column("base_salary", TypeName = "numeric(20,4)")]
+    [Column("base_salary")]
     public decimal BaseSalary { get; set; }
 
-    [Column("bonus_amount", TypeName = "numeric(20,4)")]
+    [Column("bonus_amount")]
     public decimal BonusAmount { get; set; }
 
     [Column("branch_no")]
@@ -350,16 +350,16 @@ public class HrmTaxSlab : AuditEntity
     [Column("slab_order")]
     public int SlabOrder { get; set; }
 
-    [Column("from_amount", TypeName = "numeric(20,4)")]
+    [Column("from_amount")]
     public decimal FromAmount { get; set; } = 0m;
 
-    [Column("to_amount", TypeName = "numeric(20,4)")]
+    [Column("to_amount")]
     public decimal? ToAmount { get; set; }
 
-    [Column("rate_percent", TypeName = "numeric(9,4)")]
+    [Column("rate_percent")]
     public decimal RatePercent { get; set; } = 0m;
 
-    [Column("fixed_amount", TypeName = "numeric(20,4)")]
+    [Column("fixed_amount")]
     public decimal FixedAmount { get; set; } = 0m;
 
     [NotMapped]

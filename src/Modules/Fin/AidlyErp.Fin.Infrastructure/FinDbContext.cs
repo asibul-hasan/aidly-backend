@@ -13,7 +13,6 @@ public class FinDbContext : ModuleDbContext, IFinDbContext
         : base(options, tenantContext) { }
 
     public DbSet<FinAccount> FinAccounts => Set<FinAccount>();
-    public DbSet<FinAccountGroup> FinAccountGroups => Set<FinAccountGroup>();
     public DbSet<FinAccountBalance> FinAccountBalances => Set<FinAccountBalance>();
     public DbSet<FinGlMap> FinGlMaps => Set<FinGlMap>();
     public DbSet<FinVoucher> FinVouchers => Set<FinVoucher>();
@@ -31,7 +30,8 @@ public class FinDbContext : ModuleDbContext, IFinDbContext
         modelBuilder.Entity<FinAccount>(entity =>
         {
             entity.HasIndex(e => new { e.CompanyNo, e.IsDeleted }).HasDatabaseName("idx_fin_acc_company_deleted");
-            entity.HasIndex(e => new { e.AccountGroupNo, e.IsDeleted }).HasDatabaseName("idx_fin_acc_group");
+            entity.HasIndex(e => new { e.ParentAccountNo, e.IsDeleted }).HasDatabaseName("idx_fin_acc_parent");
+            entity.HasIndex(e => new { e.CompanyNo, e.IsGroup, e.IsDeleted }).HasDatabaseName("idx_fin_acc_is_group");
         });
 
         modelBuilder.Entity<FinVoucher>(entity =>

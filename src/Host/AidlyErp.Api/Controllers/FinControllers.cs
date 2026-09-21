@@ -77,6 +77,9 @@ public class Fin1003Controller : ApiControllerBase
     [HttpGet("voucher-types")]
     public async Task<IActionResult> GetTypes() => OkResponse(await _service.GetListAsync());
 
+    [HttpGet("lookups")]
+    public async Task<IActionResult> GetLookups() => OkResponse(await _service.GetLookupsAsync());
+
     [HttpGet("voucher-types/{id:long}")]
     public async Task<IActionResult> GetDetail(long id) => OkResponse(await _service.GetDetailAsync(id));
 

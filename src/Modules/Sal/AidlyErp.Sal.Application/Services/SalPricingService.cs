@@ -158,7 +158,7 @@ public class SalPricingService : ISalPricingService
         }
 
         decimal beforeRounding = taxableTotal + taxTotal + request.ShippingCharge;
-        decimal grandTotal = Math.Round(beforeRounding, 2, MidpointRounding.AwayFromZero);
+        decimal grandTotal = beforeRounding;
 
         return new SalQuotePriceResultDto
         {
@@ -248,7 +248,7 @@ public class SalPricingService : ISalPricingService
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static decimal Round(decimal value) => Math.Round(value, MoneyScale, MidpointRounding.AwayFromZero);
+    private static decimal Round(decimal value) => value;
 
     private async Task<Dictionary<long, decimal>> TaxRatesAsync(IEnumerable<long> vatTaxNos, CancellationToken ct) =>
         await _vatTaxLookup.GetTaxRatesAsync(vatTaxNos.Distinct(), ct);

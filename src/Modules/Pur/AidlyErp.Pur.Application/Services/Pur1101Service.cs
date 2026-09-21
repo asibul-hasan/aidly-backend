@@ -289,17 +289,17 @@ public class Pur1101Service : IPur1101Service
 
             decimal qty = r.OrderQty;
             decimal unitPrice = r.UnitPrice;
-            decimal gross = Math.Round(qty * unitPrice, 4);
+            decimal gross = qty * unitPrice;
 
             // Discount: use explicit amount if set, otherwise compute from pct
             decimal discPct = r.DiscountPct;
             decimal discAmt = r.DiscountAmount > 0
                 ? r.DiscountAmount
-                : Math.Round(gross * discPct / 100m, 4);
+                : (gross * discPct / 100m);
 
             decimal taxable = gross - discAmt;
             decimal taxPct = r.TaxRatePct;
-            decimal lineTax = Math.Round(taxable * taxPct / 100m, 4);
+            decimal lineTax = taxable * taxPct / 100m;
 
             var detail = new PurOrderDtl
             {

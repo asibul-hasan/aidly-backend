@@ -228,17 +228,17 @@ public class Pur1102Service : IPur1102Service
 
             decimal qty = r.Qty;
             decimal unitPrice = r.UnitPrice > 0 ? r.UnitPrice : 0;
-            decimal gross = Math.Round(qty * unitPrice, 4);
+            decimal gross = qty * unitPrice;
 
             // Discount: use explicit amount if set, otherwise compute from pct
             decimal discPct = r.DiscountPct;
             decimal discAmt = r.DiscountAmount > 0
                 ? r.DiscountAmount
-                : Math.Round(gross * discPct / 100m, 4);
+                : (gross * discPct / 100m);
 
             decimal lineTaxable = gross - discAmt;
             decimal taxPct = r.TaxRatePct;
-            decimal lineTax = Math.Round(lineTaxable * taxPct / 100m, 4);
+            decimal lineTax = lineTaxable * taxPct / 100m;
 
             var d = new PurInvoiceDtl
             {
@@ -281,10 +281,10 @@ public class Pur1102Service : IPur1102Service
         decimal basisSum = taxableSum > 0 ? taxableSum : 1;
         foreach (var d in entities)
         {
-            decimal alloc = Math.Round(allocTotal * d.TaxableAmount / basisSum, 4);
+            decimal alloc = basisSum > 0 ? (allocTotal * d.TaxableAmount / basisSum) : 0;
             d.LandedCostAlloc = alloc;
             d.FinalUnitCost = d.QtyBase > 0
-                ? Math.Round((d.TaxableAmount + alloc) / d.QtyBase, 6)
+                ? ((d.TaxableAmount + alloc) / d.QtyBase)
                 : 0;
         }
 

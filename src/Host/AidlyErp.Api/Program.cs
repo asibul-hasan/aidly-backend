@@ -67,9 +67,13 @@ builder.Services.AddControllers()
         // (the frontend sends e.g. "company_type": 1 for a String field).
         options.JsonSerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString;
         options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeLongJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeNullableLongJsonConverter());
         options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeIntJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeNullableIntJsonConverter());
         options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeShortJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeNullableShortJsonConverter());
         options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeDecimalJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeNullableDecimalJsonConverter());
     });
 
 // ---------------------------------------------------------------------------
