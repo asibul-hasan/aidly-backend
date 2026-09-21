@@ -13,7 +13,7 @@ namespace AidlyErp.Hrm.Application.Services;
 // Hrm1008Service — HR Policy / Settings
 // Full port of Java Hrm1008Service (141 lines). Reads/writes the hr.* keys in
 // sys_setting (group HR) for the active company. Curated settings form (one
-// record per company). Missing keys fall back to BD-pack defaults.
+// record per company). Missing keys fall back to standard defaults.
 // ═══════════════════════════════════════════════════════════════════════════
 
 public interface IHrm1008Service
@@ -52,19 +52,19 @@ public class Hrm1008Service : IHrm1008Service
         long companyNo = Company();
         return new Hrm1008SettingsDto
         {
-            CountryCode = await GetStrAsync(companyNo, KCountry, "BD", ct),
-            CurrencyCode = await GetStrAsync(companyNo, KCurrency, "BDT", ct),
-            WeekendDays = await GetStrAsync(companyNo, KWeekend, "FRI,SAT", ct),
-            FiscalYearStart = await GetStrAsync(companyNo, KFY, "07-01", ct),
-            OvertimeMultiplier = await GetDecimalAsync(companyNo, KOT, 2.0m, ct),
-            OvertimeFormula = await GetStrAsync(companyNo, KOTFormula, "BASIC_SALARY / 104", ct),
+            CountryCode = await GetStrAsync(companyNo, KCountry, "", ct),
+            CurrencyCode = await GetStrAsync(companyNo, KCurrency, "", ct),
+            WeekendDays = await GetStrAsync(companyNo, KWeekend, "SAT,SUN", ct),
+            FiscalYearStart = await GetStrAsync(companyNo, KFY, "01-01", ct),
+            OvertimeMultiplier = await GetDecimalAsync(companyNo, KOT, 1.5m, ct),
+            OvertimeFormula = await GetStrAsync(companyNo, KOTFormula, "BASIC_SALARY / 208", ct),
             DailyRateFormula = await GetStrAsync(companyNo, KDayFormula, "GROSS_SALARY / CALENDAR_DAYS", ct),
             LwpFormula = await GetStrAsync(companyNo, KLwpFormula, "DAILY_RATE * LWP_DAYS", ct),
-            TaxRegime = await GetStrAsync(companyNo, KTax, "BD_NBR", ct),
-            EnableProvidentFund = await GetShortAsync(companyNo, KPF, 1, ct),
-            EnableGratuity = await GetShortAsync(companyNo, KGrat, 1, ct),
-            EnableFestivalBonus = await GetShortAsync(companyNo, KFest, 1, ct),
-            MaternityWeeks = await GetIntAsync(companyNo, KMat, 16, ct)
+            TaxRegime = await GetStrAsync(companyNo, KTax, "STANDARD", ct),
+            EnableProvidentFund = await GetShortAsync(companyNo, KPF, 0, ct),
+            EnableGratuity = await GetShortAsync(companyNo, KGrat, 0, ct),
+            EnableFestivalBonus = await GetShortAsync(companyNo, KFest, 0, ct),
+            MaternityWeeks = await GetIntAsync(companyNo, KMat, 12, ct)
         };
     }
 

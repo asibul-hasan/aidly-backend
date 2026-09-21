@@ -11,8 +11,8 @@ namespace AidlyErp.Sal.Application.Services;
 
 public interface ISalArLedgerService
 {
-    Task<decimal> DebitAsync(long customerNo, decimal amount, string transType, long docNo, string? docId, string? narration, CancellationToken ct = default);
-    Task<decimal> CreditAsync(long customerNo, decimal amount, string transType, long docNo, string? docId, string? narration, CancellationToken ct = default);
+    Task<decimal> DebitAsync(long customerNo, decimal amount, short refDocType, string refDocNo, long? refDocPk, string? remarks, CancellationToken ct = default);
+    Task<decimal> CreditAsync(long customerNo, decimal amount, short refDocType, string refDocNo, long? refDocPk, string? remarks, CancellationToken ct = default);
     Task<List<SalCustomerLedger>> GetStatementAsync(long customerNo, CancellationToken ct = default);
 }
 
@@ -27,22 +27,25 @@ public class SalArLedgerService : ISalArLedgerService
         _ctx = ctx;
     }
 
-    public async Task<decimal> DebitAsync(long customerNo, decimal amount, string transType, long docNo, string? docId, string? narration, CancellationToken ct = default)
+    public async Task<decimal> DebitAsync(long customerNo, decimal amount, short refDocType, string refDocNo, long? refDocPk, string? remarks, CancellationToken ct = default)
     {
-        return await PostAsync(customerNo, Math.Max(0, amount), 0m, transType, docNo, docId, narration, ct);
+        return await PostAsync(customerNo, Math.Max(0, amount), 0m, refDocType, refDocNo, refDocPk, remarks, ct);
     }
 
-    public async Task<decimal> CreditAsync(long customerNo, decimal amount, string transType, long docNo, string? docId, string? narration, CancellationToken ct = default)
+    public async Task<decimal> CreditAsync(long customerNo, decimal amount, short refDocType, string refDocNo, long? refDocPk, string? remarks, CancellationToken ct = default)
     {
-        return await PostAsync(customerNo, 0m, Math.Max(0, amount), transType, docNo, docId, narration, ct);
+        return await PostAsync(customerNo, 0m, Math.Max(0, amount), refDocType, refDocNo, refDocPk, remarks, ct);
     }
 
-    private async Task<decimal> PostAsync(long customerNo, decimal debit, decimal credit, string transType, long docNo, string? docId, string? narration, CancellationToken ct)
+    private async Task<decimal> PostAsync(long customerNo, decimal debit, decimal credit, short refDocType, string refDocNo, long? refDocPk, string? remarks, CancellationToken ct)
     {
-        var cust = await _db.SalCustomers.FirstOrDefaultAsync(c => c.CustomerNo == customerNo && c.IsDeleted == 0, ct)
+        if (debit < 0 || credit < 0) throw new ValidationException("Ledger amounts cannot be negative");
+
+        long companyNo = _ctx.CurrentCompanyNo() ?? throw new ValidationException("Company context is required");
+        var cust = await _db.SalCustomers.FirstOrDefaultAsync(c => c.CustomerNo == customerNo && c.CompanyNo == companyNo && c.IsDeleted == 0, ct)
             ?? throw new NotFoundException($"Customer not found: {customerNo}");
 
-        decimal prevBalance = cust.CurrentBalance;
+        decimal prevBalance = cust.CurrentDue;
         decimal balanceAfter = prevBalance + debit - credit;
 
         var row = new SalCustomerLedger
@@ -50,20 +53,20 @@ public class SalArLedgerService : ISalArLedgerService
             CompanyNo = cust.CompanyNo,
             BranchNo = cust.BranchNo ?? _ctx.CurrentBranchNo() ?? 1,
             CustomerNo = customerNo,
-            TransDate = DateTime.UtcNow,
-            TransType = transType,
-            DocNo = docNo,
-            DocId = docId,
-            Narration = narration,
-            DebitAmount = debit,
-            CreditAmount = credit,
-            BalanceAmount = balanceAfter,
+            TxnDate = DateTime.UtcNow,
+            RefDocType = refDocType,
+            RefDocNo = refDocNo,
+            RefDocPk = refDocPk,
+            Remarks = remarks,
+            Debit = debit,
+            Credit = credit,
+            BalanceAfter = balanceAfter,
             IsActive = 1, IsDeleted = 0,
             CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow
         };
 
         _db.SalCustomerLedgers.Add(row);
-        cust.CurrentBalance = balanceAfter;
+        cust.CurrentDue = balanceAfter;
         cust.UpdatedBy = _ctx.CurrentUserNo(); cust.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);

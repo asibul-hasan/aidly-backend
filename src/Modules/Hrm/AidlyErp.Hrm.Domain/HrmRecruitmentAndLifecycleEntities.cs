@@ -89,10 +89,10 @@ public class HrmJobRequisition : AuditEntity
     [Column("employment_type")]
     public short? EmploymentType { get; set; }
 
-    [Column("budget_min", TypeName = "numeric(20,4)")]
+    [Column("budget_min")]
     public decimal? BudgetMin { get; set; }
 
-    [Column("budget_max", TypeName = "numeric(20,4)")]
+    [Column("budget_max")]
     public decimal? BudgetMax { get; set; }
 
     [Column("job_description")]
@@ -159,7 +159,7 @@ public class HrmOffer : AuditEntity
     [Column("grade_no")]
     public long? GradeNo { get; set; }
 
-    [Column("offered_salary", TypeName = "numeric(20,4)")]
+    [Column("offered_salary")]
     public decimal OfferedSalary { get; set; }
 
     [Column("joining_date")]
@@ -198,7 +198,7 @@ public class HrmOffer : AuditEntity
     [NotMapped]
     public DateTime OfferDate
     {
-        get => _offerDate ?? CreatedAt;
+        get => _offerDate ?? CreatedAt ?? DateTime.MinValue;
         set => _offerDate = value;
     }
 
@@ -253,7 +253,7 @@ public class HrmEmployeeMovement : AuditEntity
     [Column("to_branch_no")]
     public long? ToBranchNo { get; set; }
 
-    [Column("new_salary", TypeName = "numeric(20,4)")]
+    [Column("new_salary")]
     public decimal? NewSalary { get; set; }
 
     [Column("reason")]
@@ -312,25 +312,25 @@ public class HrmFinalSettlement : AuditEntity, IBranchScopedEntity
     [Column("last_working_day")]
     public DateOnly? LastWorkingDay { get; set; }
 
-    [Column("last_salary", TypeName = "numeric(20,4)")]
+    [Column("last_salary")]
     public decimal? LastSalary { get; set; } = 0m;
 
-    [Column("leave_encashment", TypeName = "numeric(20,4)")]
+    [Column("leave_encashment")]
     public decimal? LeaveEncashment { get; set; } = 0m;
 
-    [Column("gratuity", TypeName = "numeric(20,4)")]
+    [Column("gratuity")]
     public decimal? Gratuity { get; set; } = 0m;
 
-    [Column("bonus_payable", TypeName = "numeric(20,4)")]
+    [Column("bonus_payable")]
     public decimal? BonusPayable { get; set; } = 0m;
 
-    [Column("loan_recovery", TypeName = "numeric(20,4)")]
+    [Column("loan_recovery")]
     public decimal? LoanRecovery { get; set; } = 0m;
 
-    [Column("other_deduction", TypeName = "numeric(20,4)")]
+    [Column("other_deduction")]
     public decimal? OtherDeduction { get; set; } = 0m;
 
-    [Column("net_payable", TypeName = "numeric(20,4)")]
+    [Column("net_payable")]
     public decimal NetPayable { get; set; } = 0m;
 
     [Column("remarks")]

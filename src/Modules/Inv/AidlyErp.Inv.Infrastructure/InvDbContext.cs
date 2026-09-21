@@ -31,6 +31,8 @@ public class InvDbContext : ModuleDbContext, IInvDbContext
     public DbSet<InvStockAdjustmentDtl> InvStockAdjustmentDtls => Set<InvStockAdjustmentDtl>();
     public DbSet<InvStockTransfer> InvStockTransfers => Set<InvStockTransfer>();
     public DbSet<InvStockTransferDtl> InvStockTransferDtls => Set<InvStockTransferDtl>();
+    public DbSet<InvPhysicalCount> InvPhysicalCounts => Set<InvPhysicalCount>();
+    public DbSet<InvPhysicalCountDtl> InvPhysicalCountDtls => Set<InvPhysicalCountDtl>();
 
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
@@ -42,12 +44,12 @@ public class InvDbContext : ModuleDbContext, IInvDbContext
 
         modelBuilder.Entity<InvStock>(entity =>
         {
-            entity.HasIndex(e => new { e.WarehouseNo, e.ProductNo, e.IsDeleted }).HasDatabaseName("idx_inv_stock_wh_prod");
+            entity.HasIndex(e => new { e.WarehouseNo, e.ProductNo }).HasDatabaseName("idx_inv_stock_wh_prod");
         });
 
         modelBuilder.Entity<InvStockLedger>(entity =>
         {
-            entity.HasIndex(e => new { e.ProductNo, e.WarehouseNo, e.TransDate }).HasDatabaseName("idx_inv_ledger_prod_wh_date");
+            entity.HasIndex(e => new { e.ProductNo, e.WarehouseNo, e.MovementDate }).HasDatabaseName("idx_inv_ledger_prod_wh_date");
         });
     }
 }

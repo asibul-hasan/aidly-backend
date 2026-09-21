@@ -43,7 +43,7 @@ public class HrmDesignation : AuditEntity, IBranchScopedEntity
     public decimal? MaxSalary { get; set; }
 
     [Column("is_overtime_eligible")]
-    public short IsOvertimeEligible { get; set; } = 0;
+    public short? IsOvertimeEligible { get; set; } = 0;
 
     [Column("branch_no")]
     public long? BranchNo { get; set; }

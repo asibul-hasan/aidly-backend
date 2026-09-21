@@ -66,7 +66,7 @@ public class HrmDepartmentService : IHrmDepartmentService
             entity.ParentDepartmentNo = dto.ParentDepartmentNo;
             entity.CostCenterNo = dto.CostCenterNo;
             entity.Remarks = dto.Remarks;
-            entity.IsActive = HrmValidation.NormalizeFlag(dto.IsActive, entity.IsActive, "is_active");
+            entity.IsActive = HrmValidation.NormalizeFlag(dto.IsActive ?? 0, entity.IsActive ?? 0, "is_active");
             entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
             return entity;
@@ -90,7 +90,7 @@ public class HrmDepartmentService : IHrmDepartmentService
                 ParentDepartmentNo = dto.ParentDepartmentNo,
                 CostCenterNo = dto.CostCenterNo,
                 Remarks = dto.Remarks,
-                IsActive = HrmValidation.NormalizeFlag(dto.IsActive, 1, "is_active"),
+                IsActive = HrmValidation.NormalizeFlag(dto.IsActive ?? 0, 1, "is_active"),
                 IsDeleted = 0,
                 CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow
             };

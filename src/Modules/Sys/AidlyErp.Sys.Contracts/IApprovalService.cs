@@ -101,6 +101,10 @@ public interface IApprovalService
     Task<Dictionary<long, ApproverView>> GetApproverViewsAsync(string documentType,
                                                                CancellationToken cancellationToken = default);
 
+    /// <summary>Map of document PK to current step name from the approval workflow configuration.</summary>
+    Task<Dictionary<long, string>> GetStepNamesAsync(string documentType, IEnumerable<long> documentPks,
+                                                     CancellationToken cancellationToken = default);
+
     /// <summary>True when the request is absent, or pending with no step yet acted on.</summary>
     Task<bool> IsUntouchedAsync(long? approvalRequestNo, CancellationToken cancellationToken = default);
 }

@@ -383,7 +383,7 @@ public class Sys1201Service : ISys1201Service
     private static Sys1201MenuDto ToMenuDto(Menu e, IReadOnlyDictionary<long, SysSubmodule> subs,
                                             IReadOnlyDictionary<long, string> moduleNames)
     {
-        subs.TryGetValue(e.SubmoduleNo, out var sub);
+        SysSubmodule? sub = e.SubmoduleNo.HasValue && subs.TryGetValue(e.SubmoduleNo.Value, out var s) ? s : null;
 
         return new Sys1201MenuDto
         {

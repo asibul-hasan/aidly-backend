@@ -1,4 +1,5 @@
 using AidlyErp.Pur.Application.Interfaces;
+using AidlyErp.Pur.Infrastructure.Repositories;
 using AidlyErp.Shared.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,6 +14,15 @@ public static class PurModuleRegistration
     public static IServiceCollection AddPurModule(this IServiceCollection services, string connectionString)
     {
         services.AddModuleDbContext<IPurDbContext, PurDbContext>(connectionString);
+
+        // Repository layer
+        services.AddScoped<IPurSupplierRepository, PurSupplierRepository>();
+        services.AddScoped<IPurInvoiceRepository, PurInvoiceRepository>();
+        services.AddScoped<IPurPaymentRepository, PurPaymentRepository>();
+        services.AddScoped<IPurSupplierLedgerRepository, PurSupplierLedgerRepository>();
+
+        // Contract implementations
+        services.AddScoped<AidlyErp.Pur.Contracts.IPurApLedgerReader, PurApLedgerReader>();
 
         return services;
     }

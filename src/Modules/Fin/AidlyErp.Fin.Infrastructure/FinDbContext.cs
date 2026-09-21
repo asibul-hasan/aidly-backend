@@ -1,5 +1,6 @@
 using AidlyErp.Fin.Application.Interfaces;
 using AidlyErp.Fin.Domain;
+using AidlyErp.Sys.Domain;
 using AidlyErp.Shared.Core.Security;
 using AidlyErp.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,6 @@ public class FinDbContext : ModuleDbContext, IFinDbContext
         : base(options, tenantContext) { }
 
     public DbSet<FinAccount> FinAccounts => Set<FinAccount>();
-    public DbSet<FinAccountGroup> FinAccountGroups => Set<FinAccountGroup>();
     public DbSet<FinAccountBalance> FinAccountBalances => Set<FinAccountBalance>();
     public DbSet<FinGlMap> FinGlMaps => Set<FinGlMap>();
     public DbSet<FinVoucher> FinVouchers => Set<FinVoucher>();
@@ -23,12 +23,15 @@ public class FinDbContext : ModuleDbContext, IFinDbContext
     public DbSet<FinBankRecon> FinBankRecons => Set<FinBankRecon>();
     public DbSet<FinBankReconLine> FinBankReconLines => Set<FinBankReconLine>();
 
+    public DbSet<Currency> Currencies => Set<Currency>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<FinAccount>(entity =>
         {
             entity.HasIndex(e => new { e.CompanyNo, e.IsDeleted }).HasDatabaseName("idx_fin_acc_company_deleted");
-            entity.HasIndex(e => new { e.AccountGroupNo, e.IsDeleted }).HasDatabaseName("idx_fin_acc_group");
+            entity.HasIndex(e => new { e.ParentAccountNo, e.IsDeleted }).HasDatabaseName("idx_fin_acc_parent");
+            entity.HasIndex(e => new { e.CompanyNo, e.IsGroup, e.IsDeleted }).HasDatabaseName("idx_fin_acc_is_group");
         });
 
         modelBuilder.Entity<FinVoucher>(entity =>

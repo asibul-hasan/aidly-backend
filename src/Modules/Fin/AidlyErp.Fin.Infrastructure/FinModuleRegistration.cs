@@ -1,4 +1,5 @@
 using AidlyErp.Fin.Application.Interfaces;
+using AidlyErp.Fin.Infrastructure.Repositories;
 using AidlyErp.Shared.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,6 +14,19 @@ public static class FinModuleRegistration
     public static IServiceCollection AddFinModule(this IServiceCollection services, string connectionString)
     {
         services.AddModuleDbContext<IFinDbContext, FinDbContext>(connectionString);
+
+        // Repositories
+        services.AddScoped<IFinAccountRepository, FinAccountRepository>();
+        services.AddScoped<IFinAccountGroupRepository, FinAccountGroupRepository>();
+        services.AddScoped<IFinAccountBalanceRepository, FinAccountBalanceRepository>();
+        services.AddScoped<IFinVoucherRepository, FinVoucherRepository>();
+        services.AddScoped<IFinVoucherDtlRepository, FinVoucherDtlRepository>();
+        services.AddScoped<IFinVoucherTypeRepository, FinVoucherTypeRepository>();
+        services.AddScoped<IFinBankAccountRepository, FinBankAccountRepository>();
+        services.AddScoped<IFinBankReconRepository, FinBankReconRepository>();
+        services.AddScoped<IFinBankReconLineRepository, FinBankReconLineRepository>();
+        services.AddScoped<IFinGlMapRepository, FinGlMapRepository>();
+        services.AddScoped<IFinLedgerRepository, FinLedgerRepository>();
 
         return services;
     }

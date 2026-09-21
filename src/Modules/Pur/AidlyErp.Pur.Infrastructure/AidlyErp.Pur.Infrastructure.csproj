@@ -7,7 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AidlyErp.Pur.Application\AidlyErp.Pur.Application.csproj" />    <ProjectReference Include="..\..\..\Shared\AidlyErp.Shared.Infrastructure\AidlyErp.Shared.Infrastructure.csproj" />  </ItemGroup>
+    <ProjectReference Include="..\AidlyErp.Pur.Application\AidlyErp.Pur.Application.csproj" />
+    <ProjectReference Include="..\..\..\Shared\AidlyErp.Shared.Infrastructure\AidlyErp.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Sys\AidlyErp.Sys.Domain\AidlyErp.Sys.Domain.csproj" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />  </ItemGroup>
 </Project>

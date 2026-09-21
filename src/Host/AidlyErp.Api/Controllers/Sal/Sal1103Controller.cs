@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using AidlyErp.Sal.Application.Dto;
 using AidlyErp.Sal.Application.Services;
 
@@ -9,7 +10,17 @@ namespace AidlyErp.Api.Controllers.Sal;
 public class Sal1103Controller : ApiControllerBase
 {
     private readonly ISal1103Service _service;
-    public Sal1103Controller(ISal1103Service service) => _service = service;
+    private readonly ISal1001Service _sales;
+
+    public Sal1103Controller(ISal1103Service service, ISal1001Service sales)
+    {
+        _service = service;
+        _sales = sales;
+    }
+
+    /// <summary>The return form fills the same four dropdowns as the sale form.</summary>
+    [HttpGet("lookups")]
+    public async Task<IActionResult> GetLookups() => OkResponse(await _sales.GetLookupsAsync());
 
     [HttpGet("returns")]
     public async Task<IActionResult> GetList() => OkResponse(await _service.GetListAsync());
@@ -22,6 +33,11 @@ public class Sal1103Controller : ApiControllerBase
 
     [HttpPost("returns/{id:long}/post")]
     public async Task<IActionResult> Post(long id) => OkResponse(await _service.PostAsync(id), "Return posted");
+
+    [HttpPost("returns/{id:long}/cancel")]
+    public async Task<IActionResult> Cancel(long id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ReasonRequest? body) =>
+        OkResponse(await _service.CancelAsync(id, body?.Reason), "Return cancelled");
 
     [HttpDelete("returns/{id:long}")]
     public async Task<IActionResult> Delete(long id)

@@ -19,7 +19,7 @@ public class UserBranch : AuditEntity
     public long BranchNo { get; set; }
 
     [Column("role_no")]
-    public long RoleNo { get; set; }
+    public long? RoleNo { get; set; }
 
     [Column("is_default")]
     public short IsDefault { get; set; } = 0;

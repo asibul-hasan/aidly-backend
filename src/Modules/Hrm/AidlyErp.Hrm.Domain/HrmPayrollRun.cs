@@ -80,6 +80,10 @@ public class HrmPayrollRun : AuditEntity, IBranchScopedEntity
     [Column("branch_no")]
     public long? BranchNo { get; set; }
 
+    [Column("gl_voucher_no")]
+    [StringLength(30)]
+    public string? GlVoucherNo { get; set; }
+
     /// <summary>Not a column — the Java HRM schema is branch-scoped; company is reached
     /// via the branch. Mapping it made every HRM query select a non-existent column.</summary>
     [NotMapped]

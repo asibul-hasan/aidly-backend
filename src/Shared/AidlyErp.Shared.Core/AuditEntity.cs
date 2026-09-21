@@ -27,11 +27,11 @@ public abstract class AuditEntity : IAuditEntity, ISoftDelete
 
     /// <summary>1 = active, 0 = inactive. Default 1 on insert.</summary>
     [Column("is_active")]
-    public short IsActive { get; set; } = 1;
+    public short? IsActive { get; set; } = 1;
 
     /// <summary>0 = live, 1 = soft-deleted. Default 0 on insert.</summary>
     [Column("is_deleted")]
-    public short IsDeleted { get; set; } = 0;
+    public short? IsDeleted { get; set; } = 0;
 
     // -----------------------------------------------------------------------
     // Created audit — set once on INSERT, never updated
@@ -41,7 +41,7 @@ public abstract class AuditEntity : IAuditEntity, ISoftDelete
     public long? CreatedBy { get; set; }
 
     [Column("created_at")]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
 
     // -----------------------------------------------------------------------
     // Updated audit — refreshed on every save
@@ -69,7 +69,7 @@ public abstract class AuditEntity : IAuditEntity, ISoftDelete
 
     [ConcurrencyCheck]
     [Column("row_version")]
-    public long RowVersion { get; set; } = 1L;
+    public long? RowVersion { get; set; } = 1L;
 
     /// <summary>
     /// Guard against legacy zero/NULL <c>row_version</c> rows so the optimistic-lock WHERE
@@ -78,7 +78,7 @@ public abstract class AuditEntity : IAuditEntity, ISoftDelete
     /// </summary>
     public void InitVersion()
     {
-        if (RowVersion <= 0) RowVersion = 1L;
+        if (RowVersion is null or <= 0) RowVersion = 1L;
     }
 
     // -----------------------------------------------------------------------
@@ -112,7 +112,7 @@ public abstract class AuditEntity : IAuditEntity, ISoftDelete
     /// <summary>Legacy alias for <see cref="IsActive"/>; the schema column is <c>is_active</c>.</summary>
     [Obsolete("Use IsActive; the schema column is is_active.")]
     [NotMapped]
-    public short ActiveStatus
+    public short? ActiveStatus
     {
         get => IsActive;
         set => IsActive = value;
@@ -141,20 +141,20 @@ public abstract class BaseEntity : AuditEntity, IMultiTenantEntity
 
 public interface IAuditEntity
 {
-    short IsActive { get; set; }
-    short IsDeleted { get; set; }
+    short? IsActive { get; set; }
+    short? IsDeleted { get; set; }
     long? CreatedBy { get; set; }
-    DateTime CreatedAt { get; set; }
+    DateTime? CreatedAt { get; set; }
     long? UpdatedBy { get; set; }
     DateTime? UpdatedAt { get; set; }
     long? DeletedBy { get; set; }
     DateTime? DeletedAt { get; set; }
-    long RowVersion { get; set; }
+    long? RowVersion { get; set; }
 }
 
 public interface ISoftDelete
 {
-    short IsDeleted { get; set; }
+    short? IsDeleted { get; set; }
     long? DeletedBy { get; set; }
     DateTime? DeletedAt { get; set; }
 }

@@ -67,9 +67,13 @@ builder.Services.AddControllers()
         // (the frontend sends e.g. "company_type": 1 for a String field).
         options.JsonSerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString;
         options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeLongJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeNullableLongJsonConverter());
         options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeIntJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeNullableIntJsonConverter());
         options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeShortJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeNullableShortJsonConverter());
         options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeDecimalJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new AidlyErp.Shared.Core.Utils.SafeNullableDecimalJsonConverter());
     });
 
 // ---------------------------------------------------------------------------
@@ -116,6 +120,8 @@ builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1104Service, Ai
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1105Service, AidlyErp.Sys.Application.Services.Sys1105Service>();
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1107Service, AidlyErp.Sys.Application.Services.Sys1107Service>();
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1108Service, AidlyErp.Sys.Application.Services.Sys1108Service>();
+builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1301Service, AidlyErp.Sys.Application.Services.Sys1301Service>();
+builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1301Service, AidlyErp.Sys.Application.Services.Sys1301Service>();
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1109Service, AidlyErp.Sys.Application.Services.Sys1109Service>();
 builder.Services.AddSingleton<AidlyErp.Sys.Application.Services.IPathFormCacheInvalidator, AidlyErp.Api.Controllers.Sys.PathFormCacheInvalidator>();
 builder.Services.AddScoped<AidlyErp.Sys.Application.Services.ISys1201Service, AidlyErp.Sys.Application.Services.Sys1201Service>();
@@ -153,9 +159,10 @@ builder.Services.AddScoped<AidlyErp.Fin.Application.Services.IFin1201Service, Ai
 builder.Services.AddScoped<AidlyErp.Fin.Application.Services.IFinPostingService, AidlyErp.Fin.Application.Services.FinPostingService>();
 builder.Services.AddHostedService<AidlyErp.Api.Services.FinPostingBackgroundService>();
 builder.Services.AddScoped<AidlyErp.Fin.Application.Services.IFinReportService, AidlyErp.Fin.Application.Services.FinReportService>();
+builder.Services.AddScoped<AidlyErp.Fin.Application.Services.IFinSubLedgerService, AidlyErp.Fin.Application.Services.FinSubLedgerService>();
 builder.Services.AddScoped<AidlyErp.Fin.Application.Services.IFin1308ChartOfAccountsPdfService, AidlyErp.Fin.Application.Services.Fin1308ChartOfAccountsPdfService>();
 builder.Services.AddScoped<AidlyErp.Fin.Application.Services.IFin1401Service, AidlyErp.Fin.Application.Services.Fin1401Service>();
-builder.Services.AddScoped<AidlyErp.Fin.Application.Services.IFinApprovalListener, AidlyErp.Fin.Application.Services.FinApprovalListener>();
+builder.Services.AddScoped<AidlyErp.Sys.Contracts.IApprovalCompletedListener, AidlyErp.Fin.Application.Services.FinApprovalListener>();
 builder.Services.AddScoped<AidlyErp.Sys.Contracts.IApprovalService, AidlyErp.Sys.Application.Services.ApprovalService>();
 
 // HRM Module Services
@@ -177,7 +184,14 @@ builder.Services.AddScoped<AidlyErp.Hrm.Application.Services.IHrm1204Service, Ai
 builder.Services.AddScoped<AidlyErp.Hrm.Application.Services.IHrm1205Service, AidlyErp.Hrm.Application.Services.Hrm1205Service>();
 builder.Services.AddScoped<AidlyErp.Hrm.Application.Services.IHrm1207Service, AidlyErp.Hrm.Application.Services.Hrm1207Service>();
 builder.Services.AddScoped<AidlyErp.Hrm.Application.Services.IHrmLeavePolicyService, AidlyErp.Hrm.Application.Services.HrmLeavePolicyService>();
-builder.Services.AddScoped<AidlyErp.Hrm.Application.Services.HrmApprovalListener>();
+builder.Services.AddScoped<AidlyErp.Sys.Contracts.IApprovalCompletedListener, AidlyErp.Hrm.Application.Services.HrmApprovalListener>();
+builder.Services.AddScoped<AidlyErp.Sys.Contracts.IApprovalCompletedListener, AidlyErp.Pur.Application.Services.PurApprovalListener>();
+
+// GlPosted listeners — stamp gl_voucher_no on source documents after auto-post
+builder.Services.AddScoped<AidlyErp.Sys.Contracts.IGlPostedListener, AidlyErp.Sal.Application.Services.SalGlPostedListener>();
+builder.Services.AddScoped<AidlyErp.Sys.Contracts.IGlPostedListener, AidlyErp.Pur.Application.Services.PurGlPostedListener>();
+builder.Services.AddScoped<AidlyErp.Sys.Contracts.IGlPostedListener, AidlyErp.Inv.Application.Services.InvGlPostedListener>();
+builder.Services.AddScoped<AidlyErp.Sys.Contracts.IGlPostedListener, AidlyErp.Hrm.Application.Services.HrmGlPostedListener>();
 
 // HRM — operational services (were missing from DI — see MIGRATION-AUDIT.md)
 builder.Services.AddScoped<AidlyErp.Hrm.Application.Services.IHrm1101Service, AidlyErp.Hrm.Application.Services.Hrm1101Service>();
@@ -238,12 +252,20 @@ builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISal1001Service, Ai
 builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISal1101Service, AidlyErp.Sal.Application.Services.Sal1101Service>();
 builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISal1102Service, AidlyErp.Sal.Application.Services.Sal1102Service>();
 builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISal1103Service, AidlyErp.Sal.Application.Services.Sal1103Service>();
+builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISal1005Service, AidlyErp.Sal.Application.Services.Sal1005Service>();
+builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISalPosService, AidlyErp.Sal.Application.Services.SalPosService>();
+builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISalPricingService, AidlyErp.Sal.Application.Services.SalPricingService>();
+builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISalPromotionEngine, AidlyErp.Sal.Application.Services.SalPromotionEngine>();
+builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISal1104Service, AidlyErp.Sal.Application.Services.Sal1104Service>();
+builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISalReportService, AidlyErp.Sal.Application.Services.SalReportService>();
 builder.Services.AddScoped<AidlyErp.Sal.Application.Services.ISalApprovalListener, AidlyErp.Sal.Application.Services.SalApprovalListener>();
 
 // INV Module Services
 builder.Services.AddScoped<AidlyErp.Inv.Contracts.IInvStockPostingService, AidlyErp.Inv.Application.Engine.InvStockPostingService>();
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInvDocSequenceService, AidlyErp.Inv.Application.Services.InvDocSequenceService>();
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInvPeriodResolver, AidlyErp.Inv.Application.Services.InvPeriodResolver>();
+builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInvLookupService, AidlyErp.Inv.Application.Services.InvLookupService>();
+builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInv1002Service, AidlyErp.Inv.Application.Services.Inv1002Service>();
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInv1001Service, AidlyErp.Inv.Application.Services.Inv1001Service>();
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInv1003Service, AidlyErp.Inv.Application.Services.Inv1003Service>();
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInv1004Service, AidlyErp.Inv.Application.Services.Inv1004Service>();
@@ -256,9 +278,12 @@ builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInv1006Service, Ai
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInv2002Service, AidlyErp.Inv.Application.Services.Inv2002Service>();
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInv2004Service, AidlyErp.Inv.Application.Services.Inv2004Service>();
 builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInv2005Service, AidlyErp.Inv.Application.Services.Inv2005Service>();
+builder.Services.AddScoped<AidlyErp.Inv.Application.Services.IInv2006Service, AidlyErp.Inv.Application.Services.Inv2006Service>();
 
 // PUR Module Services
 builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPurApLedgerService, AidlyErp.Pur.Application.Services.PurApLedgerService>();
+builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPurLookupService, AidlyErp.Pur.Application.Services.PurLookupService>();
+builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPurReportService, AidlyErp.Pur.Application.Services.PurReportService>();
 builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPur1001Service, AidlyErp.Pur.Application.Services.Pur1001Service>();
 builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPur1102Service, AidlyErp.Pur.Application.Services.Pur1102Service>();
 builder.Services.AddScoped<AidlyErp.Pur.Application.Services.IPur1104Service, AidlyErp.Pur.Application.Services.Pur1104Service>();

@@ -121,7 +121,7 @@ public class Hrm1009Service : IHrm1009Service
         await _db.SaveChangesAsync(ct);
 
         // Save new rows.
-        await SaveRowsAsync(countryCode, fiscalYear, taxpayerClass, NormalizeFlag(dto.IsActive, current.IsActive), slabs, ct);
+        await SaveRowsAsync(countryCode, fiscalYear, taxpayerClass, NormalizeFlag(dto.IsActive, current.IsActive ?? 0), slabs, ct);
 
         var profile = await LoadProfileAsync(countryCode, fiscalYear, taxpayerClass, ct);
         return ToDto(profile, true);
@@ -174,8 +174,9 @@ public class Hrm1009Service : IHrm1009Service
 
     private static string NormalizeCountry(string? value)
     {
-        var normalized = TrimRequired(value, "Country code").ToUpperInvariant();
-        if (normalized.Length > 2) throw new ValidationException("Country code must not exceed 2 characters");
+        if (string.IsNullOrWhiteSpace(value)) return "DEFAULT";
+        var normalized = value.Trim().ToUpperInvariant();
+        if (normalized.Length > 10) throw new ValidationException("Country code must not exceed 10 characters");
         return normalized;
     }
 
@@ -275,7 +276,7 @@ public class Hrm1009Service : IHrm1009Service
             FiscalYear = first.FiscalYear,
             TaxpayerClass = first.TaxpayerClass,
             SlabCount = rows.Count,
-            IsActive = first.IsActive,
+            IsActive = first.IsActive ?? 0,
             RowVersion = first.RowVersion
         };
         if (includeSlabs)
@@ -291,7 +292,7 @@ public class Hrm1009Service : IHrm1009Service
         ToAmount = row.ToAmount,
         RatePercent = row.RatePercent,
         FixedAmount = row.FixedAmount,
-        IsActive = row.IsActive,
+        IsActive = row.IsActive ?? 0,
         RowVersion = row.RowVersion
     };
 

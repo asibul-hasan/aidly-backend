@@ -84,6 +84,11 @@ public class TenantContextMiddleware
                 return;
             }
         }
+        else
+        {
+            _logger.LogWarning("TenantContextMiddleware: User is NOT authenticated for {Method} {Path}! AuthHeader={Header}",
+                context.Request.Method, context.Request.Path, context.Request.Headers.Authorization.ToString());
+        }
 
         await _next(context);
     }

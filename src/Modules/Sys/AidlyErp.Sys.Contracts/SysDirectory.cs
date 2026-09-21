@@ -128,6 +128,9 @@ public interface IFinCalendar
     /// <summary>Marks a period closed (<c>period_status = 2</c>).</summary>
     Task ClosePeriodAsync(long finPeriodNo, long actingUserNo, CancellationToken cancellationToken = default);
 
+    /// <summary>Sets a period's status to an arbitrary value (1=Open, 2=Closed, 3=Locked).</summary>
+    Task SetPeriodStatusAsync(long finPeriodNo, short status, long actingUserNo, CancellationToken cancellationToken = default);
+
     /// <summary>Marks a fiscal year closed (<c>year_status = 2</c>).</summary>
     Task CloseYearAsync(long finYearNo, long actingUserNo, CancellationToken cancellationToken = default);
 }
@@ -140,4 +143,7 @@ public interface IApprovalRequestReader
 {
     /// <summary>Current status of a request, or <c>null</c> when it no longer exists.</summary>
     Task<short?> GetStatusAsync(long approvalRequestNo, CancellationToken cancellationToken = default);
+
+    /// <summary>Current status and step of a request.</summary>
+    Task<(short Status, short CurrentStep)?> GetStateAsync(long approvalRequestNo, CancellationToken cancellationToken = default);
 }

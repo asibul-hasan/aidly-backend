@@ -445,7 +445,7 @@ public class SysNotificationService : INotificationDispatcher
             n.PayloadJson,
             n.Status,
             available,
-            n.CreatedAt
+            n.CreatedAt ?? DateTime.UtcNow
         );
     }
 }

@@ -13,8 +13,35 @@ public class Fin1001AccountDto
     [JsonPropertyName("account_name")]
     public string? AccountName { get; set; }
 
+    [JsonPropertyName("parent_account_no")]
+    public long? ParentAccountNo { get; set; }
+
+    [JsonPropertyName("parent_account_code")]
+    public string? ParentAccountCode { get; set; }
+
+    [JsonPropertyName("parent_account_name")]
+    public string? ParentAccountName { get; set; }
+
     [JsonPropertyName("account_group_no")]
-    public long AccountGroupNo { get; set; }
+    public long? AccountGroupNo
+    {
+        get => ParentAccountNo;
+        set => ParentAccountNo = value;
+    }
+
+    [JsonPropertyName("parent_group_no")]
+    public long? ParentGroupNo
+    {
+        get => ParentAccountNo;
+        set => ParentAccountNo = value;
+    }
+
+    [JsonPropertyName("account_group_name")]
+    public string? AccountGroupName
+    {
+        get => ParentAccountName;
+        set => ParentAccountName = value;
+    }
 
     [JsonPropertyName("root_type")]
     public short? RootType { get; set; }
@@ -22,38 +49,82 @@ public class Fin1001AccountDto
     [JsonPropertyName("normal_balance")]
     public string? NormalBalance { get; set; }
 
+    [JsonPropertyName("is_group")]
+    public short? IsGroup { get; set; }
+
+    [JsonPropertyName("is_group_account")]
+    public short? IsGroupAccount
+    {
+        get => IsGroup;
+        set => IsGroup = value;
+    }
+
     [JsonPropertyName("is_postable")]
-    public short IsPostable { get; set; } = 1;
+    public short? IsPostable { get; set; }
+
+    [JsonPropertyName("is_control")]
+    public short? IsControl { get; set; }
 
     [JsonPropertyName("control_type")]
     public short? ControlType { get; set; }
 
+    [JsonPropertyName("account_category")]
+    public short? AccountCategory { get; set; }
+
+    [JsonPropertyName("sub_category")]
+    public short? SubCategory { get; set; }
+
+    [JsonPropertyName("account_class")]
+    public short? AccountClass { get; set; }
+
     [JsonPropertyName("requires_cost_center")]
-    public short RequiresCostCenter { get; set; } = 0;
+    public short? RequiresCostCenter { get; set; }
 
     [JsonPropertyName("requires_party")]
-    public short RequiresParty { get; set; } = 0;
+    public short? RequiresParty { get; set; }
+
+    [JsonPropertyName("requires_reconciliation")]
+    public short? RequiresReconciliation { get; set; }
+
+    [JsonPropertyName("requires_branch")]
+    public short? RequiresBranch { get; set; }
+
+    [JsonPropertyName("requires_project")]
+    public short? RequiresProject { get; set; }
+
+    [JsonPropertyName("requires_department")]
+    public short? RequiresDepartment { get; set; }
 
     [JsonPropertyName("currency_no")]
     public long? CurrencyNo { get; set; }
 
     [JsonPropertyName("opening_balance")]
-    public decimal OpeningBalance { get; set; }
+    public decimal? OpeningBalance { get; set; }
 
     [JsonPropertyName("opening_dr_cr")]
     public string? OpeningDrCr { get; set; }
+
+    [JsonPropertyName("order_sl")]
+    public int? OrderSl { get; set; }
+
+    [JsonPropertyName("display_order")]
+    public int? DisplayOrder
+    {
+        get => OrderSl;
+        set => OrderSl = value;
+    }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
 
     [JsonPropertyName("branch_no")]
     public long? BranchNo { get; set; }
 
     [JsonPropertyName("is_active")]
-    public short IsActive { get; set; } = 1;
+    public short? IsActive { get; set; }
 
     [JsonPropertyName("row_version")]
     public long? RowVersion { get; set; }
-
-    [JsonPropertyName("account_group_name")]
-    public string? AccountGroupName { get; set; }
 }
 
 public class Fin1002AccountGroupDto
@@ -64,6 +135,13 @@ public class Fin1002AccountGroupDto
     [JsonPropertyName("group_code")]
     public string? GroupCode { get; set; }
 
+    [JsonPropertyName("account_group_id")]
+    public string? AccountGroupId
+    {
+        get => GroupCode;
+        set => GroupCode = value ?? GroupCode;
+    }
+
     [JsonPropertyName("group_name")]
     public string? GroupName { get; set; }
 
@@ -71,16 +149,26 @@ public class Fin1002AccountGroupDto
     public long? ParentGroupNo { get; set; }
 
     [JsonPropertyName("root_type")]
-    public short RootType { get; set; }
+    public short? RootType { get; set; }
 
     [JsonPropertyName("normal_balance")]
     public string? NormalBalance { get; set; }
 
     [JsonPropertyName("display_order")]
-    public int DisplayOrder { get; set; }
+    public int? DisplayOrder { get; set; }
+
+    [JsonPropertyName("order_sl")]
+    public int? OrderSl
+    {
+        get => DisplayOrder;
+        set => DisplayOrder = value ?? DisplayOrder;
+    }
+
+    [JsonPropertyName("is_control")]
+    public short? IsControl { get; set; }
 
     [JsonPropertyName("is_active")]
-    public short IsActive { get; set; } = 1;
+    public short? IsActive { get; set; }
 
     [JsonPropertyName("row_version")]
     public long? RowVersion { get; set; }
@@ -94,30 +182,94 @@ public class Fin1003VoucherTypeDto
     [JsonPropertyName("voucher_type_no")]
     public long? VoucherTypeNo { get; set; }
 
+    [JsonPropertyName("voucher_type_id")]
+    public string? VoucherTypeId
+    {
+        get => VoucherTypeCode;
+        set => VoucherTypeCode = value;
+    }
+
     [JsonPropertyName("voucher_type_code")]
     public string? VoucherTypeCode { get; set; }
+
+    [JsonPropertyName("type_name")]
+    public string? TypeName
+    {
+        get => VoucherTypeName;
+        set => VoucherTypeName = value;
+    }
 
     [JsonPropertyName("voucher_type_name")]
     public string? VoucherTypeName { get; set; }
 
     [JsonPropertyName("base_kind")]
-    public short BaseKind { get; set; }
+    public short? BaseKind { get; set; }
+
+    [JsonPropertyName("number_prefix")]
+    public string? NumberPrefix
+    {
+        get => Prefix;
+        set => Prefix = value;
+    }
 
     [JsonPropertyName("prefix")]
     public string? Prefix { get; set; }
 
+    [JsonPropertyName("default_dr_account_no")]
+    public long? DefaultDrAccountNo { get; set; }
+
+    [JsonPropertyName("default_dr_account_name")]
+    public string? DefaultDrAccountName { get; set; }
+
+    [JsonPropertyName("default_cr_account_no")]
+    public long? DefaultCrAccountNo { get; set; }
+
+    [JsonPropertyName("default_cr_account_name")]
+    public string? DefaultCrAccountName { get; set; }
+
+    [JsonPropertyName("is_system")]
+    public short? IsSystem { get; set; }
+
+    [JsonPropertyName("order_sl")]
+    public int? OrderSl { get; set; }
+
     [JsonPropertyName("requires_approval")]
-    public short RequiresApproval { get; set; } = 0;
+    public short? RequiresApproval { get; set; }
 
     [JsonPropertyName("is_auto_numbered")]
-    public short IsAutoNumbered { get; set; } = 1;
+    public short? IsAutoNumbered { get; set; }
 
     [JsonPropertyName("is_active")]
-    public short IsActive { get; set; } = 1;
+    public short? IsActive { get; set; }
 
     [JsonPropertyName("row_version")]
     public long? RowVersion { get; set; }
 }
+
+public class Fin1003AccountLookupDto
+{
+    [JsonPropertyName("account_no")]
+    public long AccountNo { get; set; }
+
+    [JsonPropertyName("account_code")]
+    public string AccountCode { get; set; } = string.Empty;
+
+    [JsonPropertyName("account_name")]
+    public string AccountName { get; set; } = string.Empty;
+
+    [JsonPropertyName("root_type")]
+    public short RootType { get; set; }
+
+    [JsonPropertyName("control_type")]
+    public short? ControlType { get; set; }
+}
+
+public class Fin1003LookupsDto
+{
+    [JsonPropertyName("accounts")]
+    public List<Fin1003AccountLookupDto> Accounts { get; set; } = new();
+}
+
 
 public class Fin1004AccountDto
 {
@@ -150,6 +302,9 @@ public class Fin1004OpeningLineDto
 
     [JsonPropertyName("opening_dr_cr")]
     public string OpeningDrCr { get; set; } = "dr";
+
+    [JsonPropertyName("line_narration")]
+    public string? LineNarration { get; set; }
 }
 
 public class Fin1004OpeningBalanceDto
@@ -184,8 +339,11 @@ public class Fin1005BankAccountDto
     [JsonPropertyName("bank_account_no")]
     public long? BankAccountNo { get; set; }
 
+    [JsonPropertyName("bank_account_id")]
+    public string? BankAccountId { get; set; }
+
     [JsonPropertyName("account_no")]
-    public long AccountNo { get; set; }
+    public long? AccountNo { get; set; }
 
     [JsonPropertyName("bank_name")]
     public string? BankName { get; set; }
@@ -196,6 +354,12 @@ public class Fin1005BankAccountDto
     [JsonPropertyName("account_number")]
     public string? AccountNumber { get; set; }
 
+    [JsonPropertyName("account_title")]
+    public string? AccountTitle { get; set; }
+
+    [JsonPropertyName("routing_number")]
+    public string? RoutingNumber { get; set; }
+
     [JsonPropertyName("swift_code")]
     public string? SwiftCode { get; set; }
 
@@ -205,11 +369,14 @@ public class Fin1005BankAccountDto
     [JsonPropertyName("currency_no")]
     public long? CurrencyNo { get; set; }
 
+    [JsonPropertyName("opening_balance")]
+    public decimal? OpeningBalance { get; set; }
+
     [JsonPropertyName("branch_no")]
     public long? BranchNo { get; set; }
 
     [JsonPropertyName("is_active")]
-    public short IsActive { get; set; } = 1;
+    public short? IsActive { get; set; }
 
     [JsonPropertyName("row_version")]
     public long? RowVersion { get; set; }
@@ -236,10 +403,10 @@ public class Fin1006GlMapDto
     public string? SubKey { get; set; }
 
     [JsonPropertyName("account_no")]
-    public long AccountNo { get; set; }
+    public long? AccountNo { get; set; }
 
     [JsonPropertyName("is_active")]
-    public short IsActive { get; set; } = 1;
+    public short? IsActive { get; set; }
 
     [JsonPropertyName("row_version")]
     public long? RowVersion { get; set; }
@@ -288,6 +455,12 @@ public class Fin1101VoucherLineDto
 
     [JsonPropertyName("against_voucher_no")]
     public long? AgainstVoucherNo { get; set; }
+
+    [JsonPropertyName("vat_tax_no")]
+    public long? VatTaxNo { get; set; }
+
+    [JsonPropertyName("tax_rate_pct")]
+    public decimal? TaxRatePct { get; set; }
 
     [JsonPropertyName("line_narration")]
     public string? LineNarration { get; set; }
@@ -485,6 +658,15 @@ public class Fin1102ReconDto
     public string? Remarks { get; set; }
 }
 
+public class Fin1102ClearedLineDto
+{
+    [JsonPropertyName("ledger_no")]
+    public long LedgerNo { get; set; }
+
+    [JsonPropertyName("bank_date")]
+    public DateTime? BankDate { get; set; }
+}
+
 public class Fin1102SaveDto
 {
     [JsonPropertyName("account_no")]
@@ -499,8 +681,14 @@ public class Fin1102SaveDto
     [JsonPropertyName("remarks")]
     public string? Remarks { get; set; }
 
+    [JsonPropertyName("narration")]
+    public string? Narration { get; set; }
+
     [JsonPropertyName("cleared_ledger_nos")]
-    public List<long> ClearedLedgerNos { get; set; } = new();
+    public List<long>? ClearedLedgerNos { get; set; }
+
+    [JsonPropertyName("cleared_lines")]
+    public List<Fin1102ClearedLineDto>? ClearedLines { get; set; }
 }
 
 public class Fin1201EventDto
@@ -552,6 +740,9 @@ public class FinStatementRowDto
 
     [JsonPropertyName("closing_balance")]
     public decimal ClosingBalance { get; set; }
+
+    [JsonPropertyName("amount")]
+    public decimal Amount { get; set; }
 }
 
 public class Fin1301TrialBalanceRowDto : FinStatementRowDto { }
@@ -680,6 +871,12 @@ public class Fin1305BalanceSheetDto
 
     [JsonPropertyName("retained_earnings")]
     public decimal RetainedEarnings { get; set; }
+
+    [JsonPropertyName("is_balanced")]
+    public bool IsBalanced { get; set; }
+
+    [JsonPropertyName("warning")]
+    public string? Warning { get; set; }
 }
 
 /// <summary>One cash/bank account line of the cash-flow statement.</summary>
@@ -806,6 +1003,12 @@ public class Fin1401PeriodDto
     [JsonPropertyName("fin_period_no")]
     public long FinPeriodNo { get; set; }
 
+    [JsonPropertyName("fin_year_no")]
+    public long FinYearNo { get; set; }
+
+    [JsonPropertyName("fin_period_id")]
+    public string? FinPeriodId { get; set; }
+
     [JsonPropertyName("period_name")]
     public string? PeriodName { get; set; }
 
@@ -814,6 +1017,9 @@ public class Fin1401PeriodDto
 
     [JsonPropertyName("end_date")]
     public DateTime EndDate { get; set; }
+
+    [JsonPropertyName("period_status")]
+    public short PeriodStatus { get; set; }
 
     [JsonPropertyName("is_closed")]
     public short IsClosed { get; set; }

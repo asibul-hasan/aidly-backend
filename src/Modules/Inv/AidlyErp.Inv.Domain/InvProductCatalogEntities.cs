@@ -12,14 +12,28 @@ public class InvProduct : AuditEntity
     [Column("product_no")]
     public long ProductNo { get; set; }
 
-    /// <summary>The business key is <c>product_id</c> in the schema, not <c>product_code</c>.</summary>
+    [Column("company_no")]
+    public long CompanyNo { get; set; }
+
     [Column("product_id")]
-    [StringLength(50)]
+    [StringLength(40)]
     public string ProductId { get; set; } = string.Empty;
 
     [Column("product_name")]
-    [StringLength(250)]
+    [StringLength(200)]
     public string ProductName { get; set; } = string.Empty;
+
+    [Column("product_name_nls")]
+    [StringLength(200)]
+    public string? ProductNameNls { get; set; }
+
+    [Column("short_name")]
+    [StringLength(60)]
+    public string? ShortName { get; set; }
+
+    /// <summary>1=Standard,2=VariantParent,3=Service,4=Bundle.</summary>
+    [Column("product_type")]
+    public short ProductType { get; set; } = 1;
 
     [Column("category_no")]
     public long CategoryNo { get; set; }
@@ -27,43 +41,113 @@ public class InvProduct : AuditEntity
     [Column("brand_no")]
     public long? BrandNo { get; set; }
 
-    [Column("uom_no")]
-    public long UomNo { get; set; }
+    [Column("base_uom_no")]
+    public long BaseUomNo { get; set; }
 
-    [Column("cost_price")]
-    public decimal CostPrice { get; set; } = 0m;
+    [Column("purchase_uom_no")]
+    public long? PurchaseUomNo { get; set; }
 
-    [Column("selling_price")]
-    public decimal SellingPrice { get; set; } = 0m;
+    [Column("sales_uom_no")]
+    public long? SalesUomNo { get; set; }
 
-    [Column("mrp")]
-    public decimal Mrp { get; set; } = 0m;
+    [Column("vat_tax_no")]
+    public long? VatTaxNo { get; set; }
 
-    [Column("costing_method")]
+    [Column("is_tax_inclusive")]
+    public short IsTaxInclusive { get; set; } = 0;
+
+    [Column("hsn_sac_code")]
     [StringLength(20)]
-    public string CostingMethod { get; set; } = "FIFO";
+    public string? HsnSacCode { get; set; }
 
-    [Column("tax_rate")]
-    public decimal TaxRate { get; set; } = 0m;
+    [Column("is_stock_tracked")]
+    public short IsStockTracked { get; set; } = 1;
+
+    [Column("is_batch_tracked")]
+    public short IsBatchTracked { get; set; } = 0;
+
+    [Column("is_expiry_tracked")]
+    public short IsExpiryTracked { get; set; } = 0;
+
+    [Column("is_serial_tracked")]
+    public short IsSerialTracked { get; set; } = 0;
 
     [Column("has_variants")]
     public short HasVariants { get; set; } = 0;
 
-    [Column("has_batches")]
-    public short HasBatches { get; set; } = 0;
+    [Column("shelf_life_days")]
+    public int? ShelfLifeDays { get; set; }
 
-    [Column("has_expiry")]
-    public short HasExpiry { get; set; } = 0;
+    [Column("cost_price")]
+    public decimal CostPrice { get; set; } = 0m;
 
-    [Column("is_stockable")]
-    public short IsStockable { get; set; } = 1;
+    [Column("purchase_price")]
+    public decimal PurchasePrice { get; set; } = 0m;
 
-    [Column("status")]
-    [StringLength(20)]
-    public string Status { get; set; } = "ACTIVE";
+    [Column("sale_price")]
+    public decimal SalePrice { get; set; } = 0m;
 
-    [Column("company_no")]
-    public long CompanyNo { get; set; }
+    [Column("mrp")]
+    public decimal Mrp { get; set; } = 0m;
+
+    [Column("min_sale_price")]
+    public decimal? MinSalePrice { get; set; }
+
+    [Column("default_margin_pct")]
+    public decimal? DefaultMarginPct { get; set; }
+
+    [Column("reorder_level")]
+    public decimal ReorderLevel { get; set; } = 0m;
+
+    [Column("reorder_qty")]
+    public decimal ReorderQty { get; set; } = 0m;
+
+    [Column("min_stock")]
+    public decimal MinStock { get; set; } = 0m;
+
+    [Column("max_stock")]
+    public decimal? MaxStock { get; set; }
+
+    [Column("weight_gm")]
+    public decimal? WeightGm { get; set; }
+
+    [Column("barcode")]
+    [StringLength(64)]
+    public string? Barcode { get; set; }
+
+    [Column("image_path")]
+    [StringLength(255)]
+    public string? ImagePath { get; set; }
+
+    [Column("is_sellable")]
+    public short IsSellable { get; set; } = 1;
+
+    [Column("is_purchasable")]
+    public short IsPurchasable { get; set; } = 1;
+
+    [Column("allow_discount")]
+    public short AllowDiscount { get; set; } = 1;
+
+    [Column("remarks")]
+    public string? Remarks { get; set; }
+
+    [NotMapped]
+    public long UomNo { get => BaseUomNo; set => BaseUomNo = value; }
+
+    [NotMapped]
+    public decimal SellingPrice { get => SalePrice; set => SalePrice = value; }
+
+    [NotMapped]
+    public decimal TaxRate { get => VatTaxNo.HasValue ? 0m : 0m; set { } }
+
+    [NotMapped]
+    public short HasBatches { get => IsBatchTracked; set => IsBatchTracked = value; }
+
+    [NotMapped]
+    public short HasExpiry { get => IsExpiryTracked; set => IsExpiryTracked = value; }
+
+    [NotMapped]
+    public short IsStockable { get => IsStockTracked; set => IsStockTracked = value; }
 }
 
 [Table("inv_category")]
@@ -74,23 +158,52 @@ public class InvCategory : AuditEntity
     [Column("category_no")]
     public long CategoryNo { get; set; }
 
-    [Column("category_code")]
+    [Column("company_no")]
+    public long CompanyNo { get; set; }
+
+    [Column("category_id")]
     [StringLength(30)]
-    public string CategoryCode { get; set; } = string.Empty;
+    public string CategoryId { get; set; } = string.Empty;
 
     [Column("category_name")]
     [StringLength(150)]
     public string CategoryName { get; set; } = string.Empty;
 
+    [Column("category_name_nls")]
+    [StringLength(150)]
+    public string? CategoryNameNls { get; set; }
+
     [Column("parent_category_no")]
     public long? ParentCategoryNo { get; set; }
 
-    [Column("description")]
-    [StringLength(250)]
-    public string? Description { get; set; }
+    [Column("branch_no")]
+    public long? BranchNo { get; set; }
 
-    [Column("company_no")]
-    public long CompanyNo { get; set; }
+    [Column("default_vat_tax_no")]
+    public long? DefaultVatTaxNo { get; set; }
+
+    [Column("depth")]
+    public short Depth { get; set; } = 1;
+
+    [Column("order_sl")]
+    public int OrderSl { get; set; }
+
+    [Column("tree_path")]
+    [StringLength(500)]
+    public string? TreePath { get; set; }
+
+    [Column("image_path")]
+    [StringLength(255)]
+    public string? ImagePath { get; set; }
+
+    [Column("remarks")]
+    public string? Remarks { get; set; }
+
+    [NotMapped]
+    public string CategoryCode { get => CategoryId; set => CategoryId = value; }
+
+    [NotMapped]
+    public string? Description { get => Remarks; set => Remarks = value; }
 }
 
 [Table("inv_brand")]
@@ -101,16 +214,34 @@ public class InvBrand : AuditEntity
     [Column("brand_no")]
     public long BrandNo { get; set; }
 
-    [Column("brand_code")]
+    [Column("company_no")]
+    public long CompanyNo { get; set; }
+
+    [Column("brand_id")]
     [StringLength(30)]
-    public string BrandCode { get; set; } = string.Empty;
+    public string BrandId { get; set; } = string.Empty;
 
     [Column("brand_name")]
     [StringLength(150)]
     public string BrandName { get; set; } = string.Empty;
 
-    [Column("company_no")]
-    public long CompanyNo { get; set; }
+    [Column("brand_name_nls")]
+    [StringLength(150)]
+    public string? BrandNameNls { get; set; }
+
+    [Column("manufacturer")]
+    [StringLength(150)]
+    public string? Manufacturer { get; set; }
+
+    [Column("image_path")]
+    [StringLength(255)]
+    public string? ImagePath { get; set; }
+
+    [Column("remarks")]
+    public string? Remarks { get; set; }
+
+    [NotMapped]
+    public string BrandCode { get => BrandId; set => BrandId = value; }
 }
 
 [Table("inv_uom")]
@@ -132,6 +263,21 @@ public class InvUom : AuditEntity
 
     [Column("company_no")]
     public long CompanyNo { get; set; }
+
+    [Column("uom_name_nls")]
+    [StringLength(100)]
+    public string? UomNameNls { get; set; }
+
+    /// <summary>1=Count 2=Weight 3=Volume 4=Length.</summary>
+    [Column("uom_type")]
+    public short UomType { get; set; } = 1;
+
+    /// <summary>How many decimals a quantity in this UOM may carry — pieces 0, kilos 3.</summary>
+    [Column("decimal_places")]
+    public short DecimalPlaces { get; set; } = 0;
+
+    [Column("remarks")]
+    public string? Remarks { get; set; }
 }
 
 [Table("inv_uom_conversion")]
@@ -139,23 +285,23 @@ public class InvUomConversion : AuditEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("conversion_no")]
-    public long ConversionNo { get; set; }
+    [Column("uom_conversion_no")]
+    public long UomConversionNo { get; set; }
+
+    [Column("product_no")]
+    public long ProductNo { get; set; }
 
     [Column("from_uom_no")]
     public long FromUomNo { get; set; }
 
-    [Column("to_uom_no")]
-    public long ToUomNo { get; set; }
-
-    [Column("multiplier")]
-    public decimal Multiplier { get; set; } = 1m;
-
-    [Column("company_no")]
-    public long CompanyNo { get; set; }
+    [Column("to_base_factor")]
+    public decimal ToBaseFactor { get; set; } = 1m;
 
     [NotMapped]
-    public decimal ConversionFactor { get => Multiplier; set => Multiplier = value; }
+    public long ConversionNo { get => UomConversionNo; set => UomConversionNo = value; }
+
+    [NotMapped]
+    public decimal Multiplier { get => ToBaseFactor; set => ToBaseFactor = value; }
 }
 
 [Table("inv_product_attribute")]
@@ -166,16 +312,22 @@ public class InvProductAttribute : AuditEntity
     [Column("attribute_no")]
     public long AttributeNo { get; set; }
 
-    [Column("attribute_code")]
+    [Column("company_no")]
+    public long CompanyNo { get; set; }
+
+    [Column("attribute_id")]
     [StringLength(30)]
-    public string? AttributeCode { get; set; }
+    public string AttributeId { get; set; } = string.Empty;
 
     [Column("attribute_name")]
     [StringLength(100)]
     public string AttributeName { get; set; } = string.Empty;
 
-    [Column("company_no")]
-    public long CompanyNo { get; set; }
+    [Column("order_sl")]
+    public int OrderSl { get; set; }
+
+    [NotMapped]
+    public string? AttributeCode { get => AttributeId; set => AttributeId = value ?? string.Empty; }
 }
 
 [Table("inv_product_attribute_value")]
@@ -183,18 +335,25 @@ public class InvProductAttributeValue : AuditEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    [Column("value_no")]
-    public long ValueNo { get; set; }
+    [Column("attribute_value_no")]
+    public long AttributeValueNo { get; set; }
 
     [Column("attribute_no")]
     public long AttributeNo { get; set; }
+
+    [Column("value_code")]
+    [StringLength(30)]
+    public string ValueCode { get; set; } = string.Empty;
+
+    [Column("order_sl")]
+    public int OrderSl { get; set; }
 
     [Column("value_name")]
     [StringLength(100)]
     public string ValueName { get; set; } = string.Empty;
 
     [NotMapped]
-    public long AttributeValueNo { get => ValueNo; set => ValueNo = value; }
+    public long ValueNo { get => AttributeValueNo; set => AttributeValueNo = value; }
 
     [NotMapped]
     public string AttributeValue { get => ValueName; set => ValueName = value; }
@@ -208,25 +367,30 @@ public class InvProductBarcode : AuditEntity
     [Column("barcode_no")]
     public long BarcodeNo { get; set; }
 
+    [Column("company_no")]
+    public long CompanyNo { get; set; }
+
     [Column("product_no")]
     public long ProductNo { get; set; }
 
     [Column("variant_no")]
     public long? VariantNo { get; set; }
 
+    [Column("uom_no")]
+    public long UomNo { get; set; }
+
     [Column("barcode")]
     [StringLength(100)]
     public string Barcode { get; set; } = string.Empty;
 
     [Column("barcode_type")]
-    [StringLength(30)]
-    public string? BarcodeType { get; set; } = "CODE128";
+    public short BarcodeType { get; set; } = 1;
 
     [Column("is_primary")]
     public short IsPrimary { get; set; } = 0;
 
-    [Column("company_no")]
-    public long CompanyNo { get; set; }
+    [Column("pack_qty")]
+    public decimal PackQty { get; set; } = 1m;
 }
 
 [Table("inv_product_variant")]
@@ -240,21 +404,49 @@ public class InvProductVariant : AuditEntity
     [Column("product_no")]
     public long ProductNo { get; set; }
 
-    [Column("variant_code")]
-    [StringLength(50)]
-    public string VariantCode { get; set; } = string.Empty;
+    [Column("variant_sku")]
+    [StringLength(48)]
+    public string VariantSku { get; set; } = string.Empty;
 
     [Column("variant_name")]
     [StringLength(200)]
     public string VariantName { get; set; } = string.Empty;
 
-    [Column("sku")]
-    [StringLength(100)]
-    public string? Sku { get; set; }
+    [Column("barcode")]
+    [StringLength(64)]
+    public string? Barcode { get; set; }
 
-    [Column("cost_price")]
-    public decimal CostPrice { get; set; } = 0m;
+    [Column("attr1_value_no")]
+    public long? Attr1ValueNo { get; set; }
 
-    [Column("selling_price")]
-    public decimal SellingPrice { get; set; } = 0m;
+    [Column("attr2_value_no")]
+    public long? Attr2ValueNo { get; set; }
+
+    [Column("attr3_value_no")]
+    public long? Attr3ValueNo { get; set; }
+
+    [Column("purchase_price")]
+    public decimal? PurchasePrice { get; set; }
+
+    [Column("sale_price")]
+    public decimal? SalePrice { get; set; }
+
+    [Column("mrp")]
+    public decimal? Mrp { get; set; }
+
+    [Column("image_path")]
+    [StringLength(255)]
+    public string? ImagePath { get; set; }
+
+    [NotMapped]
+    public string VariantCode { get => VariantSku; set => VariantSku = value; }
+
+    [NotMapped]
+    public string? Sku { get => VariantSku; set => VariantSku = value ?? string.Empty; }
+
+    [NotMapped]
+    public decimal CostPrice { get => PurchasePrice ?? 0m; set => PurchasePrice = value; }
+
+    [NotMapped]
+    public decimal SellingPrice { get => SalePrice ?? 0m; set => SalePrice = value; }
 }

@@ -1,3 +1,4 @@
+using AidlyErp.Shared.Core.Exceptions;
 using AidlyErp.Sys.Contracts;
 
 namespace AidlyErp.Inv.Application.Services;
@@ -25,18 +26,11 @@ public class InvPeriodResolver : IInvPeriodResolver
         var year = await _calendar.FindActiveYearForDateAsync(targetDate, ct)
                    ?? await _calendar.FindAnyActiveYearAsync(ct);
 
-        // Same last-resort fallback as before: a synthetic calendar year, so posting never hard-fails
-        // purely because no fiscal year has been configured yet.
-        return year ?? new FinYearInfo(
-            FinYearNo: 1,
-            CompanyNo: 0,
-            FinYearId: string.Empty,
-            FinYearName: $"{DateTime.UtcNow.Year}",
-            YearName: $"{DateTime.UtcNow.Year}",
-            StartDate: new DateOnly(DateTime.UtcNow.Year, 1, 1),
-            EndDate: new DateOnly(DateTime.UtcNow.Year, 12, 31),
-            YearStatus: 1,
-            IsClosed: 0,
-            BranchNo: null);
+        // Refuse rather than fabricate. The migration used to synthesise a year here so posting
+        // never hard-failed on an unconfigured calendar, but that stamped every ledger row with
+        // fin_year_no = 1 — a year that may belong to another company or not exist at all, and
+        // which nothing downstream can tell apart from a real one.
+        return year ?? throw new ValidationException(
+            $"No financial year covers the date {targetDate:yyyy-MM-dd} — configure the fiscal calendar first");
     }
 }

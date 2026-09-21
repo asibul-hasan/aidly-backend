@@ -328,6 +328,6 @@ public class Hrm1206Service : IHrm1206Service
         ApprovedBy = e.ApprovedBy,
         ApprovedAt = e.ApprovedAt,
         BranchNo = e.BranchNo,
-        IsActive = e.IsActive
+        IsActive = e.IsActive ?? 0
     };
 }

@@ -66,13 +66,11 @@ public class SysDbContext : ModuleDbContext, ISysDbContext
             e.Ignore(x => x.DeletedBy); e.Ignore(x => x.DeletedAt);
         });
 
-        modelBuilder.Entity<DocSequence>(e =>
-        {
-            e.Ignore(x => x.IsActive); e.Ignore(x => x.IsDeleted);
-            e.Ignore(x => x.CreatedBy); e.Ignore(x => x.CreatedAt);
-            e.Ignore(x => x.UpdatedBy); e.Ignore(x => x.UpdatedAt);
-            e.Ignore(x => x.DeletedBy); e.Ignore(x => x.DeletedAt);
-        });
+        // DocSequence used to Ignore() all nine audit members because sys_doc_sequence had none of
+        // them, which made any is_deleted filter fail at runtime with "Translation of member
+        // 'IsDeleted' ... failed". The columns were added by
+        // db-migration/2026-08-16_1300_sys_doc_sequence_audit_columns.sql, so the entity now maps
+        // them like every other AuditEntity and a series can be soft-deleted rather than dropped.
 
         modelBuilder.Entity<ExchangeRate>(e =>
         {

@@ -5,6 +5,7 @@ using AidlyErp.Shared.Core.Abstractions;
 using AidlyErp.Shared.Core.Exceptions;
 using AidlyErp.Shared.Contracts;
 using AidlyErp.Sys.Contracts;
+using AidlyErp.Shared.Core.Security;
 using AidlyErp.Hrm.Application.Interfaces;
 
 namespace AidlyErp.Hrm.Application.Services;
@@ -26,12 +27,16 @@ public interface ILeaveRuleEngine
 public class LeaveRuleEngine : ILeaveRuleEngine
 {
     private readonly IHrmDbContext _db;
+    private readonly ICompanyBranchContext? _ctx;
+    private readonly ISysSettingsStore? _settings;
     private const short Deleted = 0;
-    private static readonly List<short> BlockingStatuses = new() { 2, 3 }; // Applied, Approved
+    private static readonly List<short> BlockingStatuses = new() { 0, 1, 2, 3 }; // 0=Submitted, 1=Draft, 2=Applied, 3=Approved
 
-    public LeaveRuleEngine(IHrmDbContext db)
+    public LeaveRuleEngine(IHrmDbContext db, ICompanyBranchContext? ctx = null, ISysSettingsStore? settings = null)
     {
         _db = db;
+        _ctx = ctx;
+        _settings = settings;
     }
 
     public async Task<LeaveRules> ResolveRulesAsync(long leaveTypeNo, HrmEmployee employee, CancellationToken cancellationToken = default)
@@ -78,10 +83,24 @@ public class LeaveRuleEngine : ILeaveRuleEngine
         else
         {
             var holidays = excludeHolidays ? await GetHolidayDatesAsync(branchNo, fromDate.Date, toDate.Date, cancellationToken) : new HashSet<DateTime>();
+            HashSet<DayOfWeek>? weekendDays = null;
+            if (excludeWeekends && _settings != null && _ctx?.CompanyNo != null)
+            {
+                var settingStr = await _settings.GetAsync(_ctx.CompanyNo.Value, "hr.weekend_days", cancellationToken);
+                if (!string.IsNullOrWhiteSpace(settingStr))
+                {
+                    weekendDays = ParseWeekendDays(settingStr);
+                }
+            }
+            if (weekendDays == null && excludeWeekends)
+            {
+                weekendDays = new HashSet<DayOfWeek> { DayOfWeek.Saturday, DayOfWeek.Sunday };
+            }
+
             days = 0;
             for (var d = fromDate.Date; d <= toDate.Date; d = d.AddDays(1))
             {
-                if (excludeWeekends && IsWeekend(d)) continue;
+                if (excludeWeekends && IsWeekend(d, weekendDays)) continue;
                 if (excludeHolidays && holidays.Contains(d)) continue;
                 days++;
             }
@@ -143,7 +162,45 @@ public class LeaveRuleEngine : ILeaveRuleEngine
         return holidays.Select(d => d.ToDateTime(TimeOnly.MinValue)).ToHashSet();
     }
 
-    private static bool IsWeekend(DateTime date) => date.DayOfWeek == DayOfWeek.Friday || date.DayOfWeek == DayOfWeek.Saturday;
+    private static bool IsWeekend(DateTime date, HashSet<DayOfWeek>? weekendDays)
+    {
+        if (weekendDays != null && weekendDays.Count > 0)
+            return weekendDays.Contains(date.DayOfWeek);
+        return date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday;
+    }
+
+    private static HashSet<DayOfWeek> ParseWeekendDays(string? weekendDaysStr)
+    {
+        var result = new HashSet<DayOfWeek>();
+        if (string.IsNullOrWhiteSpace(weekendDaysStr))
+        {
+            result.Add(DayOfWeek.Saturday);
+            result.Add(DayOfWeek.Sunday);
+            return result;
+        }
+
+        var parts = weekendDaysStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var p in parts)
+        {
+            switch (p.ToUpperInvariant())
+            {
+                case "SUN": case "SUNDAY": result.Add(DayOfWeek.Sunday); break;
+                case "MON": case "MONDAY": result.Add(DayOfWeek.Monday); break;
+                case "TUE": case "TUESDAY": result.Add(DayOfWeek.Tuesday); break;
+                case "WED": case "WEDNESDAY": result.Add(DayOfWeek.Wednesday); break;
+                case "THU": case "THURSDAY": result.Add(DayOfWeek.Thursday); break;
+                case "FRI": case "FRIDAY": result.Add(DayOfWeek.Friday); break;
+                case "SAT": case "SATURDAY": result.Add(DayOfWeek.Saturday); break;
+            }
+        }
+
+        if (result.Count == 0)
+        {
+            result.Add(DayOfWeek.Saturday);
+            result.Add(DayOfWeek.Sunday);
+        }
+        return result;
+    }
 
     private void ValidateEligibility(HrmEmployee employee, HrmLeaveType type, LeaveRules rules)
     {
@@ -205,10 +262,11 @@ public class LeaveRuleEngine : ILeaveRuleEngine
     {
         var query = _db.HrmLeaveApplications
             .AsNoTracking()
+            .IgnoreQueryFilters()
             .Where(a => a.EmployeeNo == employee.EmployeeNo &&
                         a.IsDeleted == Deleted &&
                         BlockingStatuses.Contains(a.Status) &&
-                        a.FromDate <= toDate && a.ToDate >= fromDate);
+                        a.FromDate.Date <= toDate.Date && a.ToDate.Date >= fromDate.Date);
 
         if (excludeNo.HasValue)
         {

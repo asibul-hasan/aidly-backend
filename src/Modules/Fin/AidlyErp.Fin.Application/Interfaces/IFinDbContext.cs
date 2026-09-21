@@ -9,7 +9,6 @@ namespace AidlyErp.Fin.Application.Interfaces;
 public interface IFinDbContext
 {
     DbSet<FinAccount> FinAccounts { get; }
-    DbSet<FinAccountGroup> FinAccountGroups { get; }
     DbSet<FinAccountBalance> FinAccountBalances { get; }
     DbSet<FinGlMap> FinGlMaps { get; }
     DbSet<FinVoucher> FinVouchers { get; }

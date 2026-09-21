@@ -15,7 +15,7 @@ public class User : AuditEntity, ICompanyScopedEntity
     public long? CompanyNo { get; set; }
 
     [Column("employee_no")]
-    public long EmployeeNo { get; set; }
+    public long? EmployeeNo { get; set; }
 
     [Column("user_id")]
     [StringLength(50)]

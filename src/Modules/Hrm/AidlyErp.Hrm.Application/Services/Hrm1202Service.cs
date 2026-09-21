@@ -553,7 +553,7 @@ public class Hrm1202Service : IHrm1202Service
         {
             var d = a.AttDate;
             if (d < from || d > to) continue;
-            otHours += a.OtHours;
+            otHours += a.OtHours ?? 0m;
             switch (a.Status)
             {
                 case 1: case 3: case 4: present++; break; // present/late/half
@@ -944,7 +944,7 @@ public class Hrm1202Service : IHrm1202Service
         PaidBy = r.PaidBy,
         BranchNo = r.BranchNo,
         Remarks = r.Remarks,
-        IsActive = r.IsActive,
+        IsActive = r.IsActive ?? 0,
         RowVersion = r.RowVersion
     };
 
@@ -981,10 +981,10 @@ public class Hrm1202Service : IHrm1202Service
                     GradeNo = s.GradeNo,
                     GradeStepNo = s.GradeStepNo,
                     BasicSalary = s.BasicSalary,
-                    PresentDays = s.PresentDays,
-                    AbsentDays = s.AbsentDays,
-                    LeaveDays = s.LeaveDays,
-                    LwpDays = s.LwpDays,
+                    PresentDays = s.PresentDays ?? 0m,
+                    AbsentDays = s.AbsentDays ?? 0m,
+                    LeaveDays = s.LeaveDays ?? 0m,
+                    LwpDays = s.LwpDays ?? 0m,
                     PayableDays = s.PayableDays,
                     OtHours = s.OtHours,
                     OtAmount = s.OtAmount,

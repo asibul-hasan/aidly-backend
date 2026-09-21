@@ -75,17 +75,17 @@ public class SysLog
 
     [Column("http_method")]
     [StringLength(10)]
-    public string HttpMethod { get; set; } = string.Empty;
+    public string? HttpMethod { get; set; }
 
     [Column("request_uri")]
     [StringLength(500)]
-    public string RequestUri { get; set; } = string.Empty;
+    public string? RequestUri { get; set; }
 
     [Column("response_status")]
-    public int ResponseStatus { get; set; }
+    public int? ResponseStatus { get; set; }
 
     [Column("duration_ms")]
-    public long DurationMs { get; set; }
+    public long? DurationMs { get; set; }
 
     [Column("ip_address")]
     [StringLength(45)]

@@ -95,7 +95,7 @@ public class Hrm1106Service : IHrm1106Service
             FromBranchNo = emp.BranchNo,
             FromGradeNo = dto.FromGradeNo,
             Status = StDraft,
-            IsActive = NormalizeFlag(dto.IsActive, 1, "is_active"),
+            IsActive = NormalizeFlag((short)(dto.IsActive ?? 1), 1, "is_active"),
             IsDeleted = 0,
             CreatedBy = _ctx.CurrentUserNo(),
             CreatedAt = DateTime.UtcNow
@@ -116,7 +116,7 @@ public class Hrm1106Service : IHrm1106Service
         if (dto.EffectiveDate != default) entity.EffectiveDate = dto.EffectiveDate;
         ApplyTargets(entity, dto);
         if (dto.Reason != null) entity.Reason = dto.Reason;
-        if (dto.IsActive != 0) entity.IsActive = NormalizeFlag(dto.IsActive, 1, "is_active");
+        if (dto.IsActive != null) entity.IsActive = NormalizeFlag(dto.IsActive.Value, 1, "is_active");
 
         entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);

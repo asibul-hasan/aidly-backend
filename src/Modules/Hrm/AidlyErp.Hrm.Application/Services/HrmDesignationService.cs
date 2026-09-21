@@ -76,8 +76,8 @@ public class HrmDesignationService : IHrmDesignationService
             entity.GradeLevel = dto.GradeLevel;
             entity.MinSalary = dto.MinSalary;
             entity.MaxSalary = dto.MaxSalary;
-            entity.IsOvertimeEligible = HrmValidation.NormalizeFlag(dto.IsOvertimeEligible, entity.IsOvertimeEligible, "is_overtime_eligible");
-            entity.IsActive = HrmValidation.NormalizeFlag(dto.IsActive, entity.IsActive, "is_active");
+            entity.IsOvertimeEligible = HrmValidation.NormalizeFlag(dto.IsOvertimeEligible ?? 0, entity.IsOvertimeEligible ?? 0, "is_overtime_eligible");
+            entity.IsActive = HrmValidation.NormalizeFlag(dto.IsActive ?? 0, entity.IsActive ?? 0, "is_active");
             entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
             return entity;
@@ -106,8 +106,8 @@ public class HrmDesignationService : IHrmDesignationService
                 GradeLevel = dto.GradeLevel,
                 MinSalary = dto.MinSalary,
                 MaxSalary = dto.MaxSalary,
-                IsOvertimeEligible = HrmValidation.NormalizeFlag(dto.IsOvertimeEligible, 0, "is_overtime_eligible"),
-                IsActive = HrmValidation.NormalizeFlag(dto.IsActive, 1, "is_active"),
+                IsOvertimeEligible = HrmValidation.NormalizeFlag(dto.IsOvertimeEligible ?? 0, 0, "is_overtime_eligible"),
+                IsActive = HrmValidation.NormalizeFlag(dto.IsActive ?? 0, 1, "is_active"),
                 IsDeleted = 0,
                 CreatedBy = _ctx.CurrentUserNo(), CreatedAt = DateTime.UtcNow
             };

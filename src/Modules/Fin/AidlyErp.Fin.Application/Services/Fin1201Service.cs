@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using AidlyErp.Fin.Application.Interfaces;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -65,24 +66,44 @@ public class Fin1201Service : IFin1201Service
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FinApprovalListener — Workflow Approval Listener
+// Port of Java FinApprovalListener.onApprovalCompleted(ApprovalCompletedEvent).
+// Implements IApprovalCompletedListener so the shared approval engine's
+// IEnumerable<IApprovalCompletedListener> injection discovers this listener.
 // ═══════════════════════════════════════════════════════════════════════════
 
-public interface IFinApprovalListener
+public class FinApprovalListener : IApprovalCompletedListener
 {
-    Task OnApprovalOutcomeAsync(long voucherNo, bool approved, CancellationToken ct = default);
-}
+    // Resolved at callback time, not injected.
+    //
+    // ApprovalService takes IEnumerable<IApprovalCompletedListener> in its constructor, and
+    // Fin1101Service takes IApprovalService. Taking IFin1101Service here closed that loop:
+    //
+    //     ApprovalService -> FinApprovalListener -> Fin1101Service -> ApprovalService
+    //
+    // The container cannot build that, so *every* request whose controller needed anything
+    // downstream of IApprovalService — the whole of POS among them — failed with a circular
+    // dependency at controller construction. It compiles and the app still starts, because the
+    // cycle is only discovered when the graph is first walked at runtime.
+    //
+    // This is the same rule the approval docs state for ApprovalService itself ("never inject a
+    // document service into it — use the event"); it applies just as much to a listener the engine
+    // constructs. The provider here is the request scope, so the resolved service shares the
+    // engine's DbContext and transaction exactly as constructor injection would have.
+    private readonly IServiceProvider _services;
 
-public class FinApprovalListener : IFinApprovalListener
-{
-    private readonly IFin1101Service _voucherService;
-
-    public FinApprovalListener(IFin1101Service voucherService)
+    public FinApprovalListener(IServiceProvider services)
     {
-        _voucherService = voucherService;
+        _services = services;
     }
 
-    public async Task OnApprovalOutcomeAsync(long voucherNo, bool approved, CancellationToken ct = default)
+    public async Task OnApprovalCompletedAsync(string documentType, long documentPk, bool approved, CancellationToken ct = default)
     {
-        await _voucherService.ApplyApprovalOutcomeAsync(voucherNo, approved, ct);
+        switch (documentType)
+        {
+            case "FIN_VOUCHER":
+                await _services.GetRequiredService<IFin1101Service>()
+                    .ApplyApprovalOutcomeAsync(documentPk, approved, ct);
+                break;
+        }
     }
 }

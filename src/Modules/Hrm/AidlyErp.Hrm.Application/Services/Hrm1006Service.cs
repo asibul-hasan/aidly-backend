@@ -72,7 +72,7 @@ public class Hrm1006Service : IHrm1006Service
             IsRecurring = NormalizeFlagNullable(dto.IsRecurring, 0, "is_recurring"),
             LeaveYear = dto.LeaveYear > 0 ? dto.LeaveYear : date.Year,
             Remarks = dto.Remarks,
-            IsActive = NormalizeFlag(dto.IsActive, 1, "is_active"),
+            IsActive = NormalizeFlag((short)(dto.IsActive ?? 1), 1, "is_active"),
             IsDeleted = 0,
             CreatedBy = _ctx.CurrentUserNo(),
             CreatedAt = DateTime.UtcNow
@@ -98,7 +98,7 @@ public class Hrm1006Service : IHrm1006Service
         if (dto.IsRecurring != null) entity.IsRecurring = NormalizeFlagNullable(dto.IsRecurring, 0, "is_recurring");
         if (dto.LeaveYear > 0) entity.LeaveYear = dto.LeaveYear;
         if (dto.Remarks != null) entity.Remarks = dto.Remarks;
-        if (dto.IsActive != 0) entity.IsActive = NormalizeFlag(dto.IsActive, 1, "is_active");
+        if (dto.IsActive != null) entity.IsActive = NormalizeFlag(dto.IsActive.Value, 1, "is_active");
 
         entity.UpdatedBy = _ctx.CurrentUserNo(); entity.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);

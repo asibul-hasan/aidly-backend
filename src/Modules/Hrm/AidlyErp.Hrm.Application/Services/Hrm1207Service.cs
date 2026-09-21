@@ -495,7 +495,7 @@ public class Hrm1207Service : IHrm1207Service
         ApprovedBy = e.ApprovedBy,
         ApprovedAt = e.ApprovedAt,
         BranchNo = e.BranchNo,
-        IsActive = e.IsActive,
+        IsActive = e.IsActive ?? 0,
         RowVersion = e.RowVersion
     };
 

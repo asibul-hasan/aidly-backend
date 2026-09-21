@@ -37,25 +37,25 @@ public class HrmAttendance : AuditEntity, IBranchScopedEntity, IEmployeeOwnedEnt
     public short Status { get; set; }
 
     [Column("late_minutes")]
-    public int LateMinutes { get; set; } = 0;
+    public int? LateMinutes { get; set; } = 0;
 
     [Column("early_out_minutes")]
-    public int EarlyOutMinutes { get; set; } = 0;
+    public int? EarlyOutMinutes { get; set; } = 0;
 
     [Column("worked_hours")]
-    public decimal WorkedHours { get; set; } = 0;
+    public decimal? WorkedHours { get; set; } = 0;
 
     [Column("ot_hours")]
-    public decimal OtHours { get; set; } = 0;
+    public decimal? OtHours { get; set; } = 0;
 
     [Column("source")]
-    public short Source { get; set; } = 1;
+    public short? Source { get; set; } = 1;
 
     [Column("leave_application_no")]
     public long? LeaveApplicationNo { get; set; }
 
     [Column("is_locked")]
-    public short IsLocked { get; set; } = 0;
+    public short? IsLocked { get; set; } = 0;
 
     [Column("branch_no")]
     public long? BranchNo { get; set; }
@@ -73,7 +73,7 @@ public class HrmAttendance : AuditEntity, IBranchScopedEntity, IEmployeeOwnedEnt
 
     /// <summary>Alias — the schema column is <c>worked_hours</c>.</summary>
     [NotMapped]
-    public decimal WorkingHours { get => WorkedHours; set => WorkedHours = value; }
+    public decimal? WorkingHours { get => WorkedHours; set => WorkedHours = value; }
 
     /// <summary>Not a column in this schema — kept so callers and DTOs are unaffected, but never persisted.</summary>
     [NotMapped]

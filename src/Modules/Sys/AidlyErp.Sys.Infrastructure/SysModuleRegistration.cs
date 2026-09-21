@@ -21,6 +21,10 @@ public static class SysModuleRegistration
         services.AddScoped<AidlyErp.Sys.Contracts.IDocSequenceGenerator, DocSequenceGenerator>();
         services.AddScoped<AidlyErp.Sys.Contracts.IFinCalendar, FinCalendar>();
         services.AddScoped<AidlyErp.Sys.Contracts.IApprovalRequestReader, ApprovalRequestReader>();
+        services.AddScoped<AidlyErp.Sys.Contracts.IVatTaxLookup, VatTaxLookup>();
+        services.AddScoped<AidlyErp.Sys.Contracts.ICurrencyLookup, CurrencyLookup>();
+        services.AddScoped<AidlyErp.Sys.Contracts.IPartyLookup, PartyLookup>();
+        services.AddScoped<AidlyErp.Sys.Contracts.IInvLookup, InvLookup>();
         return services;
     }
 }

@@ -46,13 +46,13 @@ public class HrmSalaryComponent : AuditEntity, IBranchScopedEntity
     public short IsRegular { get; set; } = 1;
 
     [Column("is_taxable")]
-    public short IsTaxable { get; set; } = 1;
+    public short? IsTaxable { get; set; } = 1;
 
     [Column("affects_net")]
-    public short AffectsNet { get; set; } = 1;
+    public short? AffectsNet { get; set; } = 1;
 
     [Column("is_statutory")]
-    public short IsStatutory { get; set; } = 0;
+    public short? IsStatutory { get; set; } = 0;
 
     [Column("country_code")]
     [StringLength(2)]
@@ -205,10 +205,10 @@ public class HrmGrade : AuditEntity, IBranchScopedEntity
     [Column("rank_order")]
     public int? RankOrder { get; set; }
 
-    [Column("min_salary", TypeName = "numeric(20,4)")]
+    [Column("min_salary")]
     public decimal? MinSalary { get; set; }
 
-    [Column("max_salary", TypeName = "numeric(20,4)")]
+    [Column("max_salary")]
     public decimal? MaxSalary { get; set; }
 
     [Column("is_overtime_eligible")]

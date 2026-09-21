@@ -158,7 +158,7 @@ public class ApprovalRequestStep
 
     /// <summary>1=Pending, 2=Approved, 3=Rejected.</summary>
     [Column("action")]
-    public short Action { get; set; } = 1;
+    public short? Action { get; set; } = 1;
 
     [Column("acted_by")]
     public long? ActedBy { get; set; }
@@ -172,7 +172,7 @@ public class ApprovalRequestStep
 
     [ConcurrencyCheck]
     [Column("row_version")]
-    public long RowVersion { get; set; } = 1L;
+    public long? RowVersion { get; set; } = 1L;
 }
 
 [Table("sys_login_attempt")]
